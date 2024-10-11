@@ -1,0 +1,185 @@
+// Copyright 2024 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto2";
+
+package maldoca;
+
+import "google/protobuf/duration.proto";
+import "maldoca/js/babel/babel.proto";
+
+option java_multiple_files = true;
+
+// =============================================================================
+// JsReprPb: A representation for JavaScript code.
+// =============================================================================
+
+message JsReprPb {
+  oneof kind {
+    string js_source = 1;
+    BabelAstString babel_ast_string = 2;
+    string js_hir = 3;
+    string js_lir = 4;
+  }
+}
+
+// =============================================================================
+// JsPassConfig
+// =============================================================================
+
+message JsPassConfig {
+  oneof kind {
+    JsConversionConfig conversion = 1;
+
+    // Analysis
+    JsirAnalysisConfig jsir_analysis = 3;
+
+    // Transform
+    JsAstTransformConfig ast_transform = 4;
+    JsirTransformConfig jsir_transform = 5;
+  }
+}
+
+message JsPassConfigs {
+  repeated JsPassConfig passes = 1;
+}
+
+// =============================================================================
+// JsConversionConfig
+// =============================================================================
+
+message JsConversionConfig {
+  oneof kind {
+    // source <=> ast string
+    JsSourceToAstStringConfig js_source_to_ast_string = 1;
+    JsAstStringToSourceConfig js_ast_string_to_source = 2;
+
+    // ast string <=> ast
+    JsAstStringToAstConfig js_ast_string_to_ast = 3;
+    JsAstToAstStringConfig js_ast_to_ast_string = 4;
+
+    // ast <=> hir
+    JsAstToHirConfig js_ast_to_hir = 5;
+    JsHirToAstConfig js_hir_to_ast = 6;
+
+    // hir <=> lir
+    JsHirToLirConfig js_hir_to_lir = 7;
+    JsLirToHirConfig js_lir_to_hir = 8;
+  }
+}
+
+message JsSourceToAstStringConfig {
+  optional BabelParseRequest babel_parse_request = 1;
+  optional google.protobuf.Duration timeout = 2;
+}
+
+message JsAstStringToSourceConfig {
+  optional BabelGenerateOptions babel_generate_options = 1;
+  optional google.protobuf.Duration timeout = 2;
+}
+
+message JsAstStringToAstConfig {
+  optional int32 recursion_depth_limit = 1;
+}
+
+message JsAstToAstStringConfig {}
+
+message JsAstToHirConfig {}
+
+message JsHirToAstConfig {}
+
+message JsHirToLirConfig {}
+
+message JsLirToHirConfig {}
+
+// =============================================================================
+// Analysis
+// =============================================================================
+
+message JsAstAnalysisResult {
+}
+
+message JsirAnalysisConfig {
+  reserved 3, 4;
+
+  oneof kind {
+    // =========================================================================
+    // JSIR Dataflow Analyses
+    // =========================================================================
+    //
+    // The result of a JSIR dataflow analysis contains lattice elements attached
+    // to MLIR operations and MLIR values. As a result, it can't be returned in
+    // a standalone proto. Here we will just return a string for debugging
+    // purposes.
+
+    ConstantPropagation constant_propagation = 5;
+  }
+
+  message ConstantPropagation {}
+}
+
+message JsirAnalysisResult {
+  reserved 3, 4;
+
+  oneof kind {
+    DataFlow constant_propagation = 5;
+  }
+
+  message DataFlow {
+    optional string output = 1;
+  }
+}
+
+message JsAnalysisOutput {
+  oneof kind {
+    JsAstAnalysisResult ast_analysis = 1;
+    JsirAnalysisResult jsir_analysis = 2;
+  }
+}
+
+message JsAnalysisOutputs {
+  repeated JsAnalysisOutput outputs = 1;
+}
+
+// =============================================================================
+// Transform
+// =============================================================================
+
+message JsAstTransformConfig {
+  oneof kind {
+    EraseComments erase_comments = 1;
+  }
+
+  message EraseComments {}
+}
+
+message JsirTransformConfig {
+  oneof kind {
+    ConstantPropagation constant_propagation = 1;
+    MoveNamedFunctions move_named_functions = 3;
+    NormalizeObjectProperties normalize_object_properties = 4;
+    PeelParentheses peel_parentheses = 5;
+    SplitSequenceExpressions split_sequence_expressions = 6;
+  }
+
+  message ConstantPropagation {}
+
+  message MoveNamedFunctions {}
+
+  message NormalizeObjectProperties {}
+
+  message PeelParentheses {}
+
+  message SplitSequenceExpressions {}
+}

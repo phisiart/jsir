@@ -1,0 +1,14 @@
+# https://registry.bazel.build/modules/abseil-cpp
+bazel_dep(name = "abseil-cpp", version = "20240116.0")
+
+# https://registry.bazel.build/modules/nlohmann_json
+bazel_dep(name = "nlohmann_json", version = "3.11.3")
+
+# https://registry.bazel.build/modules/googletest
+bazel_dep(name = "googletest", version = "1.15.0")
+
+# https://registry.bazel.build/modules/protobuf
+bazel_dep(name = "protobuf", version = "28.2")
+
+# https://registry.bazel.build/modules/re2
+bazel_dep(name = "re2", version = "2024-07-02")
