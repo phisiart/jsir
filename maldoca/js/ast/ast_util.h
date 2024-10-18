@@ -49,10 +49,10 @@ absl::StatusOr<JsonT> GetAstJsonFromAstString(
   typename JsonT::parser_callback_t callback = nullptr;
 
   // To enforce a limit on the depth of recursion we provide a callback to the
-  // json parsing function so we can see the recursion depth of elemnts. Parsing
-  // continues to the end of the source, there is no way to interrupt it. We
-  // keep track of the max depth so the returned error gives insight into actual
-  // depths seen at runtime.
+  // json parsing function so we can see the recursion depth of elements.
+  // Parsing continues to the end of the source, there is no way to interrupt
+  // it. We keep track of the max depth so the returned error gives insight into
+  // actual depths seen at runtime.
   int max_depth = 0;
   if (recursion_depth_limit_op.has_value()) {
     callback = [&max_depth](int depth, typename JsonT::parse_event_t event,

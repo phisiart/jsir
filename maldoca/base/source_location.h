@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -96,11 +96,11 @@ class SourceLocation {
   // support them.
 
  private:
-  // Do not invoke this constructor directly. Instead, use the `MALDOCA_LOC` macro
-  // below.
+  // Do not invoke this constructor directly. Instead, use the `MALDOCA_LOC`
+  // macro below.
   //
-  // `file_name` must outlive all copies of the `maldoca::SourceLocation` object,
-  // so in practice it should be a string literal.
+  // `file_name` must outlive all copies of the `maldoca::SourceLocation`
+  // object, so in practice it should be a string literal.
   constexpr SourceLocation(std::uint_least32_t line, const char* file_name)
       : line_(line), file_name_(file_name) {}
 

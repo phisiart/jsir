@@ -26,14 +26,6 @@ namespace maldoca {
 // enclosing region. Conceptually this means moving all function declarations to
 // the beginning of the block scope.
 //
-// maldoca:google3-begin(mentions internal system)
-//
-// Reordering function declarations does not change code semantics, but has a
-// big impact on the AST structure and therefore AST similarity. DejaScript
-// depends on the exact structure of the AST to compute similarity features (see
-// go/jscat-norm-reqs).
-//
-// maldoca:google3-end
 void MoveNamedFunctions(mlir::Operation *root);
 
 struct MoveNamedFunctionsPass

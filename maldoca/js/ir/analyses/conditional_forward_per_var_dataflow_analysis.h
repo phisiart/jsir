@@ -174,7 +174,7 @@ class JsirConditionalForwardPerVarDataFlowAnalysis
 
     // Propagate from the region.
     JsirStateRef<StateT> exit_state = GetStateAtEndOf(&declarations_exit);
-    exit_state.AddDependent(op);
+    exit_state.AddDependent(Base::getProgramPointAfter(op));
     after.Join(exit_state.value());
   }
 

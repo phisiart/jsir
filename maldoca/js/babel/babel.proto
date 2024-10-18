@@ -107,12 +107,6 @@ message BabelParseRequest {
   // on whether sourceType is 'module'. However, the source code has a bug such
   // that even if strictMode is true, the parser still depends on sourceType.
   //
-  // Comment:
-  // http://google3/third_party/javascript/node_modules/babel_parser/v7_14_0/typings/babel-parser.d.ts;l=89;rcl=371442948
-  //
-  // Implementation:
-  // http://google3/third_party/javascript/node_modules/babel_parser/v7_14_0/lib/index.js;l=8330;rcl=371442948
-  //
   // Implementation:
   // +------------------------+--------------------------+
   // |                        |        strictMode        |
@@ -120,7 +114,7 @@ message BabelParseRequest {
   // |                        | undefined | true | false |
   // +---------------+--------+-----------+------+-------+
   // | source type   | module |        ✓         |       |
-  // | (spceified    +--------+------------------+   ✗   |
+  // | (specified    +--------+------------------+   ✗   |
   // |  or inferred) | script |        ✗         |       |
   // +---------------+--------+------------------+-------+
   //
@@ -131,7 +125,7 @@ message BabelParseRequest {
   // |                        | undefined | true | false |
   // +---------------+--------+-----------+------+-------+
   // | source type   | module |     ✓     |      |       |
-  // | (spceified    +--------+-----------+  ✓   |   ✗   |
+  // | (specified    +--------+-----------+  ✓   |   ✗   |
   // |  or inferred) | script |     ✗     |      |       |
   // +---------------+--------+-----------+------+-------+
   enum StrictMode {

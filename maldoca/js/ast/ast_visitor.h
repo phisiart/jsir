@@ -25,7 +25,7 @@ namespace maldoca {
 // The AST visitor is the main API for visiting the AST. Clients are supposed to
 // sub-class the JsAstVisitor class and implement all the functions.
 // Note that JsAstVisitor only defines functions to visit the leaf nodes in the
-// type hierachy of the AST API.
+// type hierarchy of the AST API.
 template <typename R>
 class JsAstVisitor {
  public:
@@ -250,7 +250,7 @@ class JsAstVisitor {
     }
   }
 
-  R VisitStatement(const JsStatement &statement) {
+  virtual R VisitStatement(const JsStatement &statement) {
     const JsStatement *statement_ptr = &statement;
     if (const JsBlockStatement *block_statement =
             dynamic_cast<const JsBlockStatement *>(statement_ptr)) {
@@ -946,7 +946,7 @@ class MutableJsAstVisitor {
                    dynamic_cast<JsAssignmentPattern *>(l_val_ptr)) {
       return VisitAssignmentPattern(*assignment_pattern);
     }
-    }
+  }
 };
 
 class EmptyJsAstVisitor : public JsAstVisitor<void> {
@@ -1168,6 +1168,416 @@ class EmptyJsAstVisitor : public JsAstVisitor<void> {
 
   void VisitExportAllDeclaration(
       const JsExportAllDeclaration &export_all_declaration) override {}
+};
+
+// Redirects every Visit* method to a single VisitNodeDefault() method. This
+// provides a simple way of defining a callback for AstWalker.
+//
+// Example:
+//
+// ```
+// class MyJsVisitor : public DefaultJsAstVisitor {
+//   void VisitNodeDefault(const JsNode& node) override {
+//     ...
+//     // Do something.
+//   }
+// };
+//
+// JsFile file = ...;
+// MyJsVisitor visitor;
+// JsAstWalker walker(&visitor, /*preorder_callback=*/&visitor);
+// walker.VisitFile(file);
+// ```
+class DefaultJsAstVisitor : public EmptyJsAstVisitor {
+ public:
+  ~DefaultJsAstVisitor() override = default;
+
+  void VisitInterpreterDirective(
+      const JsInterpreterDirective &interpreter_directive) override {
+    this->VisitNodeDefault(interpreter_directive);
+  }
+
+  void VisitDirectiveLiteral(
+      const JsDirectiveLiteral &directive_literal) override {
+    this->VisitNodeDefault(directive_literal);
+  }
+
+  void VisitDirective(const JsDirective &directive) override {
+    this->VisitNodeDefault(directive);
+  }
+
+  void VisitProgram(const JsProgram &program) override {
+    this->VisitNodeDefault(program);
+  }
+
+  void VisitFile(const JsFile &file) override { this->VisitNodeDefault(file); }
+
+  void VisitIdentifier(const JsIdentifier &identifier) override {
+    this->VisitNodeDefault(identifier);
+  }
+
+  void VisitPrivateName(const JsPrivateName &private_name) override {
+    this->VisitNodeDefault(private_name);
+  }
+
+  void VisitRegExpLiteral(const JsRegExpLiteral &reg_exp_literal) override {
+    this->VisitNodeDefault(reg_exp_literal);
+  }
+
+  void VisitNullLiteral(const JsNullLiteral &null_literal) override {
+    this->VisitNodeDefault(null_literal);
+  }
+
+  void VisitStringLiteral(const JsStringLiteral &string_literal) override {
+    this->VisitNodeDefault(string_literal);
+  }
+
+  void VisitBooleanLiteral(const JsBooleanLiteral &boolean_literal) override {
+    this->VisitNodeDefault(boolean_literal);
+  }
+
+  void VisitNumericLiteral(const JsNumericLiteral &numeric_literal) override {
+    this->VisitNodeDefault(numeric_literal);
+  }
+
+  void VisitBigIntLiteral(const JsBigIntLiteral &big_int_literal) override {
+    this->VisitNodeDefault(big_int_literal);
+  }
+
+  void VisitBlockStatement(const JsBlockStatement &block_statement) override {
+    this->VisitNodeDefault(block_statement);
+  }
+
+  void VisitExpressionStatement(
+      const JsExpressionStatement &expression_statement) override {
+    this->VisitNodeDefault(expression_statement);
+  }
+
+  void VisitEmptyStatement(const JsEmptyStatement &empty_statement) override {
+    this->VisitNodeDefault(empty_statement);
+  }
+
+  void VisitDebuggerStatement(
+      const JsDebuggerStatement &debugger_statement) override {
+    this->VisitNodeDefault(debugger_statement);
+  }
+
+  void VisitWithStatement(const JsWithStatement &with_statement) override {
+    this->VisitNodeDefault(with_statement);
+  }
+
+  void VisitReturnStatement(
+      const JsReturnStatement &return_statement) override {
+    this->VisitNodeDefault(return_statement);
+  }
+
+  void VisitLabeledStatement(
+      const JsLabeledStatement &labeled_statement) override {
+    this->VisitNodeDefault(labeled_statement);
+  }
+
+  void VisitBreakStatement(const JsBreakStatement &break_statement) override {
+    this->VisitNodeDefault(break_statement);
+  }
+
+  void VisitContinueStatement(
+      const JsContinueStatement &continue_statement) override {
+    this->VisitNodeDefault(continue_statement);
+  }
+
+  void VisitIfStatement(const JsIfStatement &if_statement) override {
+    this->VisitNodeDefault(if_statement);
+  }
+
+  void VisitSwitchCase(const JsSwitchCase &switch_case) override {
+    this->VisitNodeDefault(switch_case);
+  }
+
+  void VisitSwitchStatement(
+      const JsSwitchStatement &switch_statement) override {
+    this->VisitNodeDefault(switch_statement);
+  }
+
+  void VisitThrowStatement(const JsThrowStatement &throw_statement) override {
+    this->VisitNodeDefault(throw_statement);
+  }
+
+  void VisitCatchClause(const JsCatchClause &catch_clause) override {
+    this->VisitNodeDefault(catch_clause);
+  }
+
+  void VisitTryStatement(const JsTryStatement &try_statement) override {
+    this->VisitNodeDefault(try_statement);
+  }
+
+  void VisitWhileStatement(const JsWhileStatement &while_statement) override {
+    this->VisitNodeDefault(while_statement);
+  }
+
+  void VisitDoWhileStatement(
+      const JsDoWhileStatement &do_while_statement) override {
+    this->VisitNodeDefault(do_while_statement);
+  }
+
+  void VisitVariableDeclarator(
+      const JsVariableDeclarator &variable_declarator) override {
+    this->VisitNodeDefault(variable_declarator);
+  }
+
+  void VisitVariableDeclaration(
+      const JsVariableDeclaration &variable_declaration) override {
+    this->VisitNodeDefault(variable_declaration);
+  }
+
+  void VisitForStatement(const JsForStatement &for_statement) override {
+    this->VisitNodeDefault(for_statement);
+  }
+
+  void VisitForInStatement(const JsForInStatement &for_in_statement) override {
+    this->VisitNodeDefault(for_in_statement);
+  }
+
+  void VisitForOfStatement(const JsForOfStatement &for_of_statement) override {
+    this->VisitNodeDefault(for_of_statement);
+  }
+
+  void VisitFunctionDeclaration(
+      const JsFunctionDeclaration &function_declaration) override {
+    this->VisitNodeDefault(function_declaration);
+  }
+
+  void VisitSuper(const JsSuper &super) override {
+    this->VisitNodeDefault(super);
+  }
+
+  void VisitImport(const JsImport &import) override {
+    this->VisitNodeDefault(import);
+  }
+
+  void VisitThisExpression(const JsThisExpression &this_expression) override {
+    this->VisitNodeDefault(this_expression);
+  }
+
+  void VisitArrowFunctionExpression(
+      const JsArrowFunctionExpression &arrow_function_expression) override {
+    this->VisitNodeDefault(arrow_function_expression);
+  }
+
+  void VisitYieldExpression(
+      const JsYieldExpression &yield_expression) override {
+    this->VisitNodeDefault(yield_expression);
+  }
+
+  void VisitAwaitExpression(
+      const JsAwaitExpression &await_expression) override {
+    this->VisitNodeDefault(await_expression);
+  }
+
+  void VisitSpreadElement(const JsSpreadElement &spread_element) override {
+    this->VisitNodeDefault(spread_element);
+  }
+
+  void VisitArrayExpression(
+      const JsArrayExpression &array_expression) override {
+    this->VisitNodeDefault(array_expression);
+  }
+
+  void VisitObjectProperty(const JsObjectProperty &object_property) override {
+    this->VisitNodeDefault(object_property);
+  }
+
+  void VisitObjectMethod(const JsObjectMethod &object_method) override {
+    this->VisitNodeDefault(object_method);
+  }
+
+  void VisitObjectExpression(
+      const JsObjectExpression &object_expression) override {
+    this->VisitNodeDefault(object_expression);
+  }
+
+  void VisitFunctionExpression(
+      const JsFunctionExpression &function_expression) override {
+    this->VisitNodeDefault(function_expression);
+  }
+
+  void VisitUnaryExpression(
+      const JsUnaryExpression &unary_expression) override {
+    this->VisitNodeDefault(unary_expression);
+  }
+
+  void VisitUpdateExpression(
+      const JsUpdateExpression &update_expression) override {
+    this->VisitNodeDefault(update_expression);
+  }
+
+  void VisitBinaryExpression(
+      const JsBinaryExpression &binary_expression) override {
+    this->VisitNodeDefault(binary_expression);
+  }
+
+  void VisitAssignmentExpression(
+      const JsAssignmentExpression &assignment_expression) override {
+    this->VisitNodeDefault(assignment_expression);
+  }
+
+  void VisitLogicalExpression(
+      const JsLogicalExpression &logical_expression) override {
+    this->VisitNodeDefault(logical_expression);
+  }
+
+  void VisitMemberExpression(
+      const JsMemberExpression &member_expression) override {
+    this->VisitNodeDefault(member_expression);
+  }
+
+  void VisitOptionalMemberExpression(
+      const JsOptionalMemberExpression &optional_member_expression) override {
+    this->VisitNodeDefault(optional_member_expression);
+  }
+
+  void VisitConditionalExpression(
+      const JsConditionalExpression &conditional_expression) override {
+    this->VisitNodeDefault(conditional_expression);
+  }
+
+  void VisitCallExpression(const JsCallExpression &call_expression) override {
+    this->VisitNodeDefault(call_expression);
+  }
+
+  void VisitOptionalCallExpression(
+      const JsOptionalCallExpression &optional_call_expression) override {
+    this->VisitNodeDefault(optional_call_expression);
+  }
+
+  void VisitNewExpression(const JsNewExpression &new_expression) override {
+    this->VisitNodeDefault(new_expression);
+  }
+
+  void VisitSequenceExpression(
+      const JsSequenceExpression &sequence_expression) override {
+    this->VisitNodeDefault(sequence_expression);
+  }
+
+  void VisitParenthesizedExpression(
+      const JsParenthesizedExpression &parenthesized_expression) override {
+    this->VisitNodeDefault(parenthesized_expression);
+  }
+
+  void VisitTemplateElement(
+      const JsTemplateElement &template_element) override {
+    this->VisitNodeDefault(template_element);
+  }
+
+  void VisitTemplateLiteral(
+      const JsTemplateLiteral &template_literal) override {
+    this->VisitNodeDefault(template_literal);
+  }
+
+  void VisitTaggedTemplateExpression(
+      const JsTaggedTemplateExpression &tagged_template_expression) override {
+    this->VisitNodeDefault(tagged_template_expression);
+  }
+
+  void VisitRestElement(const JsRestElement &rest_element) override {
+    this->VisitNodeDefault(rest_element);
+  }
+
+  void VisitObjectPattern(const JsObjectPattern &object_pattern) override {
+    this->VisitNodeDefault(object_pattern);
+  }
+
+  void VisitArrayPattern(const JsArrayPattern &array_pattern) override {
+    this->VisitNodeDefault(array_pattern);
+  }
+
+  void VisitAssignmentPattern(
+      const JsAssignmentPattern &assignment_pattern) override {
+    this->VisitNodeDefault(assignment_pattern);
+  }
+
+  void VisitClassMethod(const JsClassMethod &class_method) override {
+    this->VisitNodeDefault(class_method);
+  }
+
+  void VisitClassPrivateMethod(
+      const JsClassPrivateMethod &class_private_method) override {
+    this->VisitNodeDefault(class_private_method);
+  }
+
+  void VisitClassProperty(const JsClassProperty &class_property) override {
+    this->VisitNodeDefault(class_property);
+  }
+
+  void VisitClassPrivateProperty(
+      const JsClassPrivateProperty &class_private_property) override {
+    this->VisitNodeDefault(class_private_property);
+  }
+
+  void VisitClassBody(const JsClassBody &class_body) override {
+    this->VisitNodeDefault(class_body);
+  }
+
+  void VisitClassDeclaration(
+      const JsClassDeclaration &class_declaration) override {
+    this->VisitNodeDefault(class_declaration);
+  }
+
+  void VisitClassExpression(
+      const JsClassExpression &class_expression) override {
+    this->VisitNodeDefault(class_expression);
+  }
+
+  void VisitMetaProperty(const JsMetaProperty &meta_property) override {
+    this->VisitNodeDefault(meta_property);
+  }
+
+  void VisitImportSpecifier(
+      const JsImportSpecifier &import_specifier) override {
+    this->VisitNodeDefault(import_specifier);
+  }
+
+  void VisitImportDefaultSpecifier(
+      const JsImportDefaultSpecifier &import_default_specifier) override {
+    this->VisitNodeDefault(import_default_specifier);
+  }
+
+  void VisitImportNamespaceSpecifier(
+      const JsImportNamespaceSpecifier &import_namespace_specifier) override {
+    this->VisitNodeDefault(import_namespace_specifier);
+  }
+
+  void VisitImportAttribute(
+      const JsImportAttribute &import_attribute) override {
+    this->VisitNodeDefault(import_attribute);
+  }
+
+  void VisitImportDeclaration(
+      const JsImportDeclaration &import_declaration) override {
+    this->VisitNodeDefault(import_declaration);
+  }
+
+  void VisitExportSpecifier(
+      const JsExportSpecifier &export_specifier) override {
+    this->VisitNodeDefault(export_specifier);
+  }
+
+  void VisitExportNamedDeclaration(
+      const JsExportNamedDeclaration &export_named_declaration) override {
+    this->VisitNodeDefault(export_named_declaration);
+  }
+
+  void VisitExportDefaultDeclaration(
+      const JsExportDefaultDeclaration &export_default_declaration) override {
+    this->VisitNodeDefault(export_default_declaration);
+  }
+
+  void VisitExportAllDeclaration(
+      const JsExportAllDeclaration &export_all_declaration) override {
+    this->VisitNodeDefault(export_all_declaration);
+  }
+
+  // override this method to customize the default behavior on each JS AST node.
+  virtual void VisitNodeDefault(const JsNode &node) = 0;
 };
 
 class EmptyMutableJsAstVisitor : public MutableJsAstVisitor<void> {

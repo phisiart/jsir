@@ -18,7 +18,6 @@
 #include <optional>
 #include <ostream>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -31,6 +30,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/cord.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -52,7 +52,7 @@ StatusBuilder::Rep::Rep(const Rep& r)
       sink(r.sink) {}
 
 absl::Status StatusBuilder::JoinMessageToStatus(absl::Status s,
-                                                std::string_view msg,
+                                                absl::string_view msg,
                                                 MessageJoinStyle style) {
   if (msg.empty()) {
     return s;
@@ -183,13 +183,13 @@ void StatusBuilder::SetStatusCode(absl::StatusCode canonical_code,
 }
 
 void StatusBuilder::CopyPayloads(const absl::Status& src, absl::Status* dst) {
-  src.ForEachPayload([&](std::string_view type_url, absl::Cord payload) {
+  src.ForEachPayload([&](absl::string_view type_url, absl::Cord payload) {
     dst->SetPayload(type_url, payload);
   });
 }
 
 absl::Status StatusBuilder::WithMessage(const absl::Status& status,
-                                        std::string_view msg) {
+                                        absl::string_view msg) {
   // Unfortunately since we can't easily strip the source-location off of this
   // new status the backtrace can end up with a lot of copies of this line at
   // the beginning. We manually try to trim them out but we can't actually
@@ -203,8 +203,8 @@ absl::Status StatusBuilder::WithMessage(const absl::Status& status,
   bool first_non_duplicate = false;
   for (const SourceLocation& sl : StatusBuilder::GetSourceLocations(status)) {
     if (!first_non_duplicate && first && first->line() == sl.line() &&
-        std::string_view(first->file_name()) ==
-            std::string_view(sl.file_name())) {
+        absl::string_view(first->file_name()) ==
+            absl::string_view(sl.file_name())) {
       continue;
     }
     first_non_duplicate = true;
@@ -215,12 +215,12 @@ absl::Status StatusBuilder::WithMessage(const absl::Status& status,
 }
 
 absl::Status StatusBuilder::AnnotateStatus(const absl::Status& s,
-                                           std::string_view msg) {
+                                           absl::string_view msg) {
   if (s.ok() || msg.empty()) {
     return s;
   }
 
-  std::string_view new_msg = msg;
+  absl::string_view new_msg = msg;
   std::string annotated;
   if (!s.message().empty()) {
     absl::StrAppend(&annotated, s.message(), "; ", msg);

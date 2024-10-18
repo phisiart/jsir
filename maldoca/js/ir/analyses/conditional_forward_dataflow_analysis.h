@@ -100,7 +100,8 @@ template <typename ValueT, typename StateT>
 JsirStateRef<JsirExecutable>
 JsirConditionalForwardDataFlowAnalysis<ValueT, StateT>::GetIsExecutable(
     mlir::Block *block) {
-  return Base::template GetStateImpl<JsirExecutable>(block);
+  return Base::template GetStateImpl<JsirExecutable>(
+      Base::getProgramPointBefore(block));
 }
 
 template <typename ValueT, typename StateT>
@@ -155,7 +156,7 @@ void JsirConditionalForwardDataFlowAnalysis<
   for (mlir::Block *pred : block->getPredecessors()) {
     auto *edge = Base::GetCFGEdge(pred, block);
     JsirStateRef<JsirExecutable> edge_executable_ref = GetIsExecutable(edge);
-    edge_executable_ref.AddDependent(block);
+    edge_executable_ref.AddDependent(Base::getProgramPointBefore(block));
   }
 
   // The first time the block is marked as executable, visit all ops.
@@ -163,7 +164,7 @@ void JsirConditionalForwardDataFlowAnalysis<
   // This is because some ops (e.g. constant) do not have other dependencies.
   JsirStateRef<JsirExecutable> block_executable_ref = GetIsExecutable(block);
   for (mlir::Operation &op : *block) {
-    block_executable_ref.AddDependent(&op);
+    block_executable_ref.AddDependent(Base::getProgramPointAfter(&op));
   }
 
   if (block->isEntryBlock()) {

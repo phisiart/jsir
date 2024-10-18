@@ -43,9 +43,9 @@ cc_test(
 )
 
 cc_library(
-    name = "file",
-    srcs = ["file.cc"],
-    hdrs = ["file.h"],
+    name = "filesystem",
+    srcs = ["filesystem.cc"],
+    hdrs = ["filesystem.h"],
     deps = [
         ":error_code_to_status",
         ":status",

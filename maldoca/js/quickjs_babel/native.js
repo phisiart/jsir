@@ -16,7 +16,6 @@ exports = {};
 // |---------+--------------------+---------------------------+
 // |   C++   | absl::Base64Escape | absl::WebSafeBase64Escape |
 // +---------+--------------------+---------------------------+
-// LINT.IfChange
 /**
  * Base64-encodes a string.
  *
@@ -25,7 +24,6 @@ exports = {};
  */
 function base64Encode(value) {
   return atob(value);
-  // return Buffer.from(value, 'utf16le').toString('base64');
 }
 
 /**
@@ -36,9 +34,7 @@ function base64Encode(value) {
  */
 function base64Decode(value) {
   return btoa(value);
-  // return Buffer.from(value, 'base64').toString('utf16le');
 }
-// LINT.ThenChange(//depot/google3/third_party/maldoca/js/ast/ast_util.cc)
 
 /**
  * A StringLiteral looks like this:
@@ -134,7 +130,9 @@ function base64DecodeStringLiterals(node, visited = new Set()) {
 /**
  * Replaces characteres in the range [U+D800, U+DFFF] with '�' (U+FFFD).
  *
+ // copybara:strip_begin(internal comment)
  * See: b/235090893.
+ // copybara:strip_end
  *
  * @param {string} source
  * @return {string}

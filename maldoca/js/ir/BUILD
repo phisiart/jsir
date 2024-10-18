@@ -376,7 +376,7 @@ cc_binary(
     srcs = ["jsir_gen.cc"],
     deps = [
         ":jsir_gen_lib",
-        "//maldoca/base:file",
+        "//maldoca/base:filesystem",
         "//maldoca/js/babel:babel_cc_proto",
         "//maldoca/js/driver:driver_cc_proto",
         "//maldoca/js/quickjs_babel",

@@ -37,7 +37,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
-#include "maldoca/base/file.h"
+#include "maldoca/base/filesystem.h"
 #include "maldoca/js/driver/driver.pb.h"
 #include "maldoca/js/ir/jsir_gen_lib.h"
 #include "maldoca/js/quickjs_babel/quickjs_babel.h"

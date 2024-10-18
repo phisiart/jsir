@@ -102,7 +102,7 @@ class JsirStateRef {
   // Marks a program point as depending on this state.
   // This means that whenever this state is updated, we trigger a visit() of
   // that program point.
-  void AddDependent(mlir::ProgramPoint point);
+  void AddDependent(mlir::ProgramPoint *point);
 
   // Writes the state and triggers visit()s of its dependents.
   void Write(absl::FunctionRef<mlir::ChangeResult(T *)> write_fn);
@@ -313,7 +313,7 @@ class JsirDenseDataFlowAnalysis
 
  private:
   // Override `mlir::DataFlowAnalysis::visit` and redirect to `Visit{Op,Block}`.
-  mlir::LogicalResult visit(mlir::ProgramPoint point) override;
+  mlir::LogicalResult visit(mlir::ProgramPoint *point) override;
 };
 
 template <typename StateT>
@@ -439,7 +439,7 @@ using JsirBackwardDataFlowAnalysis =
 // =============================================================================
 
 template <typename T>
-void JsirStateRef<T>::AddDependent(mlir::ProgramPoint point) {
+void JsirStateRef<T>::AddDependent(mlir::ProgramPoint *point) {
   element_->addDependency(point, analysis_);
 }
 
@@ -499,7 +499,7 @@ JsirDenseDataFlowAnalysis<StateT, direction>::GetStateBefore(
   if (auto *prev_op = op->getPrevNode()) {
     return GetStateAfter(prev_op);
   } else {
-    return GetStateImpl<StateT>(op->getBlock());
+    return GetStateImpl<StateT>(getProgramPointBefore(op->getBlock()));
   }
 }
 
@@ -507,14 +507,14 @@ template <typename StateT, DataflowDirection direction>
 JsirStateRef<StateT>
 JsirDenseDataFlowAnalysis<StateT, direction>::GetStateAfter(
     mlir::Operation *op) {
-  return GetStateImpl<StateT>(op);
+  return GetStateImpl<StateT>(getProgramPointAfter(op));
 }
 
 template <typename StateT, DataflowDirection direction>
 JsirStateRef<StateT>
 JsirDenseDataFlowAnalysis<StateT, direction>::GetStateAtEntryOf(
     mlir::Block *block) {
-  return GetStateImpl<StateT>(block);
+  return GetStateImpl<StateT>(getProgramPointBefore(block));
 }
 
 template <typename StateT, DataflowDirection direction>
@@ -634,10 +634,10 @@ mlir::LogicalResult JsirDenseDataFlowAnalysis<StateT, direction>::initialize(
   if (op->getParentOp() != nullptr) {
     if constexpr (direction == DataflowDirection::kForward) {
       JsirStateRef<StateT> before_state_ref = GetStateBefore(op);
-      before_state_ref.AddDependent(op);
+      before_state_ref.AddDependent(getProgramPointAfter(op));
     } else if constexpr (direction == DataflowDirection::kBackward) {
       JsirStateRef<StateT> after_state_ref = GetStateAfter(op);
-      after_state_ref.AddDependent(op);
+      after_state_ref.AddDependent(getProgramPointAfter(op));
     }
   }
 
@@ -695,7 +695,7 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::InitializeBlockDependencies(
     // end state and link it to the block.
     for (mlir::Block *pred : block->getPredecessors()) {
       JsirStateRef<StateT> pred_state_ref = GetStateAtEndOf(pred);
-      pred_state_ref.AddDependent(block);
+      pred_state_ref.AddDependent(getProgramPointBefore(block));
     }
   } else if constexpr (direction == DataflowDirection::kBackward) {
     // For each block, we should update its predecessor blocks when the state
@@ -703,18 +703,18 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::InitializeBlockDependencies(
     // end state and link it to the block.
     for (mlir::Block *succ : block->getSuccessors()) {
       JsirStateRef<StateT> succ_state_ref = GetStateAtEntryOf(succ);
-      succ_state_ref.AddDependent(block);
+      succ_state_ref.AddDependent(getProgramPointBefore(block));
     }
   }
 }
 
 template <typename StateT, DataflowDirection direction>
 mlir::LogicalResult JsirDenseDataFlowAnalysis<StateT, direction>::visit(
-    mlir::ProgramPoint point) {
-  if (auto op = point.dyn_cast<mlir::Operation *>()) {
-    VisitOp(op);
-  } else if (auto block = point.dyn_cast<mlir::Block *>()) {
-    VisitBlock(block);
+    mlir::ProgramPoint *point) {
+  if (!point->isBlockStart()) {
+    VisitOp(point->getPrevOp());
+  } else if (!point->isNull()) {
+    VisitBlock(point->getBlock());
   }
   return mlir::success();
 }
@@ -766,11 +766,11 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::VisitCFGEdge(
 
   if constexpr (direction == DataflowDirection::kForward) {
     // Merge the predecessor into the successor.
-    pred_state_ref.AddDependent(succ);
+    pred_state_ref.AddDependent(getProgramPointBefore(succ));
     succ_state_ref.Join(pred_state_ref.value());
   } else if constexpr (direction == DataflowDirection::kBackward) {
     // Merge the successor into the predecessor.
-    succ_state_ref.AddDependent(pred);
+    succ_state_ref.AddDependent(getProgramPointBefore(pred));
     pred_state_ref.Join(succ_state_ref.value());
   }
 }
@@ -828,7 +828,7 @@ mlir::LogicalResult JsirDataFlowAnalysis<ValueT, StateT, direction>::initialize(
   // The op depends on its input operands.
   for (mlir::Value operand : op->getOperands()) {
     JsirStateRef<ValueT> operand_state_ref = GetStateAt(operand);
-    operand_state_ref.AddDependent(op);
+    operand_state_ref.AddDependent(Base::getProgramPointAfter(op));
   }
 
   return Base::initialize(op);
