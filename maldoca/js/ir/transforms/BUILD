@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//maldoca/js:allowed_users.bzl", "JSIR_ALLOWED_USERS")
+
 package(
     default_applicable_licenses = ["//:license"],
-    default_visibility = [
-        "//maldoca/js:__subpackages__",
-    ],
+    default_visibility = JSIR_ALLOWED_USERS,
 )
 
 cc_library(

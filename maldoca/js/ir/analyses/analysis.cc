@@ -41,6 +41,7 @@ static absl::StatusOr<JsirAnalysisResult::DataFlow> RunJsirDataFlowAnalysis(
     mlir::Operation *op, Args &&...args) {
   static_assert(std::is_base_of_v<JsirDataFlowAnalysisPrinter, AnalysisT>,
                 "The analysis must inherit JsirDataFlowAnalysisPrinter.");
+
   mlir::DataFlowSolver solver;
 
   JsirDataFlowAnalysisPrinter *analysis =

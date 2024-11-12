@@ -2,6 +2,8 @@
 
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
+package(default_applicable_licenses = ["//:license"])
+
 bzl_library(
     name = "import_llvm_bzl",
     srcs = ["import_llvm.bzl"],

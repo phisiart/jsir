@@ -36,10 +36,11 @@ absl::StatusOr<std::string> GetFileContents(
     const std::filesystem::path& file_name);
 
 // Parses a single text formatted protobuf from the given string which is
-// assumed to have come from the given file.
+// assumed to have come from the given file. The file name is only used for
+// error reporting.
 //
 // REQUIRES: `contents` is a single text formatted protobuf.
-// REQUIRES: The proto must point to a valid object.
+// REQUIRES: The proto must point to a valid object compatible with the text.
 // Typical return codes (not guaranteed to be exhaustive):
 //  * StatusCode::kOk
 //  * StatusCode::kFailedPrecondition (the file contents couldn't be parsed as
@@ -56,7 +57,7 @@ absl::Status ParseTextProto(absl::string_view contents,
 //
 // REQUIRES: `file_name` can be opened for reading.
 // REQUIRES: The contents of `file_name` are a single text formatted protobuf.
-// REQUIRES: The proto must point to a valid object.
+// REQUIRES: The proto must point to a valid object compatible with the text.
 // Typical return codes (not guaranteed to be exhaustive):
 //  * StatusCode::kOk
 //  * StatusCode::kPermissionDenied (file not readable)

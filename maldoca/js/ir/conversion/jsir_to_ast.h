@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
 #ifndef MALDOCA_JS_IR_CONVERSION_JSIR_TO_AST_H_
 #define MALDOCA_JS_IR_CONVERSION_JSIR_TO_AST_H_
 
-#include <iostream>
 #include <memory>
 #include <optional>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -31,6 +30,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"

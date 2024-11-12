@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,11 +27,13 @@ cc_library(
     hdrs = ["pass.h"],
     deps = [
         "//maldoca/js/ir",
+        "//maldoca/js/ir/analyses:dataflow_analysis",
         "//maldoca/js/ir/analyses/constant_propagation:analysis",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
     ],

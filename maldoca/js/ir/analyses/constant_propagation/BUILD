@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,11 +31,11 @@ cc_library(
         "//maldoca/js/ir/analyses:conditional_forward_per_var_dataflow_analysis",
         "//maldoca/js/ir/analyses:dataflow_analysis",
         "//maldoca/js/ir/analyses:per_var_state",
-        "//maldoca/js/ir/analyses:scope",
         "@abseil-cpp//absl/log:check",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
     ],
 )

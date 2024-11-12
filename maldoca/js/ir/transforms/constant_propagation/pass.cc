@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,17 +17,27 @@
 
 #include "maldoca/js/ir/transforms/constant_propagation/pass.h"
 
+#include <cassert>
 #include <vector>
 
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/DataFlowFramework.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Region.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "maldoca/js/ir/analyses/constant_propagation/analysis.h"
+#include "maldoca/js/ir/analyses/dataflow_analysis.h"
 #include "maldoca/js/ir/ir.h"
 
 namespace maldoca {

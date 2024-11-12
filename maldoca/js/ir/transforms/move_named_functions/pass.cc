@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
 
 #include <vector>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Support/LogicalResult.h"
+#include "mlir/IR/Region.h"
 #include "maldoca/js/ir/ir.h"
 
 namespace maldoca {

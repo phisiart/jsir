@@ -21,7 +21,6 @@ licenses(["notice"])
 
 exports_files(
     srcs = [
-        "babel.js",
         "babel.min.js",
     ],
     visibility = ["//visibility:public"],

@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 
 #include <cstddef>
 #include <optional>
-#include <utility>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -29,12 +28,7 @@
 #include "mlir/IR/BlockSupport.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Visitors.h"
-#include "mlir/Interfaces/ControlFlowInterfaces.h"
-#include "mlir/Support/LogicalResult.h"
-#include "absl/functional/function_ref.h"
-#include "absl/types/span.h"
 #include "maldoca/js/ir/analyses/dataflow_analysis.h"
-#include "maldoca/js/ir/analyses/state.h"
 
 namespace maldoca {
 

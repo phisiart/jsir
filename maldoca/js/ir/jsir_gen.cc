@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@
 // Converts a JavaScript file into JSIR. Outputs the IR to stdout.
 
 // Usage:
-// blaze run //third_party/maldoca/js/ir:jsir_gen -- \
+//
+// bazel run //maldoca/js/ir:jsir_gen -- \
 //   --input_file=test.js \
 //   --output_dialect=jshir
 

@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 // NOLINTBEGIN(whitespace/line_length)
 // clang-format off
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -33,6 +34,7 @@
 #include "absl/memory/memory.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
@@ -340,7 +342,7 @@ void JsSourceLocation::set_end(std::unique_ptr<JsPosition> end) {
 
 std::optional<absl::string_view> JsSourceLocation::identifier_name() const {
   if (!identifier_name_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return identifier_name_.value();
   }
@@ -737,7 +739,7 @@ JsNode::JsNode(
 
 std::optional<JsSourceLocation*> JsNode::loc() {
   if (!loc_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return loc_.value().get();
   }
@@ -745,7 +747,7 @@ std::optional<JsSourceLocation*> JsNode::loc() {
 
 std::optional<const JsSourceLocation*> JsNode::loc() const {
   if (!loc_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return loc_.value().get();
   }
@@ -757,7 +759,7 @@ void JsNode::set_loc(std::optional<std::unique_ptr<JsSourceLocation>> loc) {
 
 std::optional<int64_t> JsNode::start() const {
   if (!start_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return start_.value();
   }
@@ -769,7 +771,7 @@ void JsNode::set_start(std::optional<int64_t> start) {
 
 std::optional<int64_t> JsNode::end() const {
   if (!end_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return end_.value();
   }
@@ -781,7 +783,7 @@ void JsNode::set_end(std::optional<int64_t> end) {
 
 std::optional<std::vector<std::unique_ptr<JsComment>>*> JsNode::leading_comments() {
   if (!leading_comments_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &leading_comments_.value();
   }
@@ -789,7 +791,7 @@ std::optional<std::vector<std::unique_ptr<JsComment>>*> JsNode::leading_comments
 
 std::optional<const std::vector<std::unique_ptr<JsComment>>*> JsNode::leading_comments() const {
   if (!leading_comments_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &leading_comments_.value();
   }
@@ -801,7 +803,7 @@ void JsNode::set_leading_comments(std::optional<std::vector<std::unique_ptr<JsCo
 
 std::optional<std::vector<std::unique_ptr<JsComment>>*> JsNode::trailing_comments() {
   if (!trailing_comments_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &trailing_comments_.value();
   }
@@ -809,7 +811,7 @@ std::optional<std::vector<std::unique_ptr<JsComment>>*> JsNode::trailing_comment
 
 std::optional<const std::vector<std::unique_ptr<JsComment>>*> JsNode::trailing_comments() const {
   if (!trailing_comments_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &trailing_comments_.value();
   }
@@ -821,7 +823,7 @@ void JsNode::set_trailing_comments(std::optional<std::vector<std::unique_ptr<JsC
 
 std::optional<std::vector<std::unique_ptr<JsComment>>*> JsNode::inner_comments() {
   if (!inner_comments_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &inner_comments_.value();
   }
@@ -829,7 +831,7 @@ std::optional<std::vector<std::unique_ptr<JsComment>>*> JsNode::inner_comments()
 
 std::optional<const std::vector<std::unique_ptr<JsComment>>*> JsNode::inner_comments() const {
   if (!inner_comments_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &inner_comments_.value();
   }
@@ -841,7 +843,7 @@ void JsNode::set_inner_comments(std::optional<std::vector<std::unique_ptr<JsComm
 
 std::optional<int64_t> JsNode::scope_uid() const {
   if (!scope_uid_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return scope_uid_.value();
   }
@@ -957,7 +959,7 @@ void JsDirectiveLiteral::set_value(std::string value) {
 
 std::optional<JsDirectiveLiteralExtra*> JsDirectiveLiteral::extra() {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -965,7 +967,7 @@ std::optional<JsDirectiveLiteralExtra*> JsDirectiveLiteral::extra() {
 
 std::optional<const JsDirectiveLiteralExtra*> JsDirectiveLiteral::extra() const {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1027,7 +1029,7 @@ JsProgram::JsProgram(
 
 std::optional<JsInterpreterDirective*> JsProgram::interpreter() {
   if (!interpreter_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return interpreter_.value().get();
   }
@@ -1035,7 +1037,7 @@ std::optional<JsInterpreterDirective*> JsProgram::interpreter() {
 
 std::optional<const JsInterpreterDirective*> JsProgram::interpreter() const {
   if (!interpreter_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return interpreter_.value().get();
   }
@@ -1273,7 +1275,7 @@ void JsRegExpLiteral::set_flags(std::string flags) {
 
 std::optional<JsRegExpLiteralExtra*> JsRegExpLiteral::extra() {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1281,7 +1283,7 @@ std::optional<JsRegExpLiteralExtra*> JsRegExpLiteral::extra() {
 
 std::optional<const JsRegExpLiteralExtra*> JsRegExpLiteral::extra() const {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1363,7 +1365,7 @@ void JsStringLiteral::set_value(std::string value) {
 
 std::optional<JsStringLiteralExtra*> JsStringLiteral::extra() {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1371,7 +1373,7 @@ std::optional<JsStringLiteralExtra*> JsStringLiteral::extra() {
 
 std::optional<const JsStringLiteralExtra*> JsStringLiteral::extra() const {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1463,7 +1465,7 @@ void JsNumericLiteral::set_value(double value) {
 
 std::optional<JsNumericLiteralExtra*> JsNumericLiteral::extra() {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1471,7 +1473,7 @@ std::optional<JsNumericLiteralExtra*> JsNumericLiteral::extra() {
 
 std::optional<const JsNumericLiteralExtra*> JsNumericLiteral::extra() const {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1537,7 +1539,7 @@ void JsBigIntLiteral::set_value(std::string value) {
 
 std::optional<JsBigIntLiteralExtra*> JsBigIntLiteral::extra() {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1545,7 +1547,7 @@ std::optional<JsBigIntLiteralExtra*> JsBigIntLiteral::extra() {
 
 std::optional<const JsBigIntLiteralExtra*> JsBigIntLiteral::extra() const {
   if (!extra_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return extra_.value().get();
   }
@@ -1579,7 +1581,7 @@ JsFunction::JsFunction(
 
 std::optional<JsIdentifier*> JsFunction::id() {
   if (!id_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return id_.value().get();
   }
@@ -1587,7 +1589,7 @@ std::optional<JsIdentifier*> JsFunction::id() {
 
 std::optional<const JsIdentifier*> JsFunction::id() const {
   if (!id_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return id_.value().get();
   }
@@ -1822,7 +1824,7 @@ JsReturnStatement::JsReturnStatement(
 
 std::optional<JsExpression*> JsReturnStatement::argument() {
   if (!argument_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return argument_.value().get();
   }
@@ -1830,7 +1832,7 @@ std::optional<JsExpression*> JsReturnStatement::argument() {
 
 std::optional<const JsExpression*> JsReturnStatement::argument() const {
   if (!argument_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return argument_.value().get();
   }
@@ -1902,7 +1904,7 @@ JsBreakStatement::JsBreakStatement(
 
 std::optional<JsIdentifier*> JsBreakStatement::label() {
   if (!label_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return label_.value().get();
   }
@@ -1910,7 +1912,7 @@ std::optional<JsIdentifier*> JsBreakStatement::label() {
 
 std::optional<const JsIdentifier*> JsBreakStatement::label() const {
   if (!label_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return label_.value().get();
   }
@@ -1939,7 +1941,7 @@ JsContinueStatement::JsContinueStatement(
 
 std::optional<JsIdentifier*> JsContinueStatement::label() {
   if (!label_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return label_.value().get();
   }
@@ -1947,7 +1949,7 @@ std::optional<JsIdentifier*> JsContinueStatement::label() {
 
 std::optional<const JsIdentifier*> JsContinueStatement::label() const {
   if (!label_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return label_.value().get();
   }
@@ -2004,7 +2006,7 @@ void JsIfStatement::set_consequent(std::unique_ptr<JsStatement> consequent) {
 
 std::optional<JsStatement*> JsIfStatement::alternate() {
   if (!alternate_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return alternate_.value().get();
   }
@@ -2012,7 +2014,7 @@ std::optional<JsStatement*> JsIfStatement::alternate() {
 
 std::optional<const JsStatement*> JsIfStatement::alternate() const {
   if (!alternate_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return alternate_.value().get();
   }
@@ -2042,7 +2044,7 @@ JsSwitchCase::JsSwitchCase(
 
 std::optional<JsExpression*> JsSwitchCase::test() {
   if (!test_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return test_.value().get();
   }
@@ -2050,7 +2052,7 @@ std::optional<JsExpression*> JsSwitchCase::test() {
 
 std::optional<const JsExpression*> JsSwitchCase::test() const {
   if (!test_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return test_.value().get();
   }
@@ -2164,7 +2166,7 @@ JsCatchClause::JsCatchClause(
 
 std::optional<JsPattern*> JsCatchClause::param() {
   if (!param_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return param_.value().get();
   }
@@ -2172,7 +2174,7 @@ std::optional<JsPattern*> JsCatchClause::param() {
 
 std::optional<const JsPattern*> JsCatchClause::param() const {
   if (!param_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return param_.value().get();
   }
@@ -2229,7 +2231,7 @@ void JsTryStatement::set_block(std::unique_ptr<JsBlockStatement> block) {
 
 std::optional<JsCatchClause*> JsTryStatement::handler() {
   if (!handler_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return handler_.value().get();
   }
@@ -2237,7 +2239,7 @@ std::optional<JsCatchClause*> JsTryStatement::handler() {
 
 std::optional<const JsCatchClause*> JsTryStatement::handler() const {
   if (!handler_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return handler_.value().get();
   }
@@ -2249,7 +2251,7 @@ void JsTryStatement::set_handler(std::optional<std::unique_ptr<JsCatchClause>> h
 
 std::optional<JsBlockStatement*> JsTryStatement::finalizer() {
   if (!finalizer_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return finalizer_.value().get();
   }
@@ -2257,7 +2259,7 @@ std::optional<JsBlockStatement*> JsTryStatement::finalizer() {
 
 std::optional<const JsBlockStatement*> JsTryStatement::finalizer() const {
   if (!finalizer_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return finalizer_.value().get();
   }
@@ -2400,7 +2402,7 @@ void JsVariableDeclarator::set_id(std::unique_ptr<JsLVal> id) {
 
 std::optional<JsExpression*> JsVariableDeclarator::init() {
   if (!init_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return init_.value().get();
   }
@@ -2408,7 +2410,7 @@ std::optional<JsExpression*> JsVariableDeclarator::init() {
 
 std::optional<const JsExpression*> JsVariableDeclarator::init() const {
   if (!init_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return init_.value().get();
   }
@@ -2483,7 +2485,7 @@ JsForStatement::JsForStatement(
 
 std::optional<std::variant<JsVariableDeclaration*, JsExpression*>> JsForStatement::init() {
   if (!init_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     switch (init_.value().index()) {
       case 0: {
@@ -2500,7 +2502,7 @@ std::optional<std::variant<JsVariableDeclaration*, JsExpression*>> JsForStatemen
 
 std::optional<std::variant<const JsVariableDeclaration*, const JsExpression*>> JsForStatement::init() const {
   if (!init_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     switch (init_.value().index()) {
       case 0: {
@@ -2521,7 +2523,7 @@ void JsForStatement::set_init(std::optional<std::variant<std::unique_ptr<JsVaria
 
 std::optional<JsExpression*> JsForStatement::test() {
   if (!test_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return test_.value().get();
   }
@@ -2529,7 +2531,7 @@ std::optional<JsExpression*> JsForStatement::test() {
 
 std::optional<const JsExpression*> JsForStatement::test() const {
   if (!test_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return test_.value().get();
   }
@@ -2541,7 +2543,7 @@ void JsForStatement::set_test(std::optional<std::unique_ptr<JsExpression>> test)
 
 std::optional<JsExpression*> JsForStatement::update() {
   if (!update_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return update_.value().get();
   }
@@ -2549,7 +2551,7 @@ std::optional<JsExpression*> JsForStatement::update() {
 
 std::optional<const JsExpression*> JsForStatement::update() const {
   if (!update_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return update_.value().get();
   }
@@ -2870,7 +2872,7 @@ JsYieldExpression::JsYieldExpression(
 
 std::optional<JsExpression*> JsYieldExpression::argument() {
   if (!argument_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return argument_.value().get();
   }
@@ -2878,7 +2880,7 @@ std::optional<JsExpression*> JsYieldExpression::argument() {
 
 std::optional<const JsExpression*> JsYieldExpression::argument() const {
   if (!argument_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return argument_.value().get();
   }
@@ -2915,7 +2917,7 @@ JsAwaitExpression::JsAwaitExpression(
 
 std::optional<JsExpression*> JsAwaitExpression::argument() {
   if (!argument_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return argument_.value().get();
   }
@@ -2923,7 +2925,7 @@ std::optional<JsExpression*> JsAwaitExpression::argument() {
 
 std::optional<const JsExpression*> JsAwaitExpression::argument() const {
   if (!argument_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return argument_.value().get();
   }
@@ -3935,7 +3937,7 @@ JsTemplateElementValue::JsTemplateElementValue(
 
 std::optional<absl::string_view> JsTemplateElementValue::cooked() const {
   if (!cooked_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return cooked_.value();
   }
@@ -4335,7 +4337,7 @@ void JsClassPrivateMethod::set_static_(bool static_) {
 
 std::optional<bool> JsClassPrivateMethod::computed() const {
   if (!computed_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return computed_.value();
   }
@@ -4381,7 +4383,7 @@ void JsClassProperty::set_key(std::unique_ptr<JsExpression> key) {
 
 std::optional<JsExpression*> JsClassProperty::value() {
   if (!value_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return value_.value().get();
   }
@@ -4389,7 +4391,7 @@ std::optional<JsExpression*> JsClassProperty::value() {
 
 std::optional<const JsExpression*> JsClassProperty::value() const {
   if (!value_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return value_.value().get();
   }
@@ -4449,7 +4451,7 @@ void JsClassPrivateProperty::set_key(std::unique_ptr<JsPrivateName> key) {
 
 std::optional<JsExpression*> JsClassPrivateProperty::value() {
   if (!value_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return value_.value().get();
   }
@@ -4457,7 +4459,7 @@ std::optional<JsExpression*> JsClassPrivateProperty::value() {
 
 std::optional<const JsExpression*> JsClassPrivateProperty::value() const {
   if (!value_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return value_.value().get();
   }
@@ -4523,7 +4525,7 @@ JsClass::JsClass(
 
 std::optional<JsExpression*> JsClass::super_class() {
   if (!super_class_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return super_class_.value().get();
   }
@@ -4531,7 +4533,7 @@ std::optional<JsExpression*> JsClass::super_class() {
 
 std::optional<const JsExpression*> JsClass::super_class() const {
   if (!super_class_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return super_class_.value().get();
   }
@@ -4576,7 +4578,7 @@ JsClassDeclaration::JsClassDeclaration(
 
 std::optional<JsIdentifier*> JsClassDeclaration::id() {
   if (!id_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return id_.value().get();
   }
@@ -4584,7 +4586,7 @@ std::optional<JsIdentifier*> JsClassDeclaration::id() {
 
 std::optional<const JsIdentifier*> JsClassDeclaration::id() const {
   if (!id_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return id_.value().get();
   }
@@ -4616,7 +4618,7 @@ JsClassExpression::JsClassExpression(
 
 std::optional<JsIdentifier*> JsClassExpression::id() {
   if (!id_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return id_.value().get();
   }
@@ -4624,7 +4626,7 @@ std::optional<JsIdentifier*> JsClassExpression::id() {
 
 std::optional<const JsIdentifier*> JsClassExpression::id() const {
   if (!id_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return id_.value().get();
   }
@@ -4899,7 +4901,7 @@ void JsImportDeclaration::set_source(std::unique_ptr<JsStringLiteral> source) {
 
 std::optional<JsImportAttribute*> JsImportDeclaration::assertions() {
   if (!assertions_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return assertions_.value().get();
   }
@@ -4907,7 +4909,7 @@ std::optional<JsImportAttribute*> JsImportDeclaration::assertions() {
 
 std::optional<const JsImportAttribute*> JsImportDeclaration::assertions() const {
   if (!assertions_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return assertions_.value().get();
   }
@@ -4968,7 +4970,7 @@ void JsExportSpecifier::set_exported(std::variant<std::unique_ptr<JsIdentifier>,
 
 std::optional<std::variant<JsIdentifier*, JsStringLiteral*>> JsExportSpecifier::local() {
   if (!local_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     switch (local_.value().index()) {
       case 0: {
@@ -4985,7 +4987,7 @@ std::optional<std::variant<JsIdentifier*, JsStringLiteral*>> JsExportSpecifier::
 
 std::optional<std::variant<const JsIdentifier*, const JsStringLiteral*>> JsExportSpecifier::local() const {
   if (!local_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     switch (local_.value().index()) {
       case 0: {
@@ -5029,7 +5031,7 @@ JsExportNamedDeclaration::JsExportNamedDeclaration(
 
 std::optional<JsDeclaration*> JsExportNamedDeclaration::declaration() {
   if (!declaration_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return declaration_.value().get();
   }
@@ -5037,7 +5039,7 @@ std::optional<JsDeclaration*> JsExportNamedDeclaration::declaration() {
 
 std::optional<const JsDeclaration*> JsExportNamedDeclaration::declaration() const {
   if (!declaration_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return declaration_.value().get();
   }
@@ -5061,7 +5063,7 @@ void JsExportNamedDeclaration::set_specifiers(std::vector<std::unique_ptr<JsExpo
 
 std::optional<JsStringLiteral*> JsExportNamedDeclaration::source() {
   if (!source_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return source_.value().get();
   }
@@ -5069,7 +5071,7 @@ std::optional<JsStringLiteral*> JsExportNamedDeclaration::source() {
 
 std::optional<const JsStringLiteral*> JsExportNamedDeclaration::source() const {
   if (!source_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return source_.value().get();
   }
@@ -5081,7 +5083,7 @@ void JsExportNamedDeclaration::set_source(std::optional<std::unique_ptr<JsString
 
 std::optional<std::vector<std::unique_ptr<JsImportAttribute>>*> JsExportNamedDeclaration::assertions() {
   if (!assertions_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &assertions_.value();
   }
@@ -5089,7 +5091,7 @@ std::optional<std::vector<std::unique_ptr<JsImportAttribute>>*> JsExportNamedDec
 
 std::optional<const std::vector<std::unique_ptr<JsImportAttribute>>*> JsExportNamedDeclaration::assertions() const {
   if (!assertions_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &assertions_.value();
   }
@@ -5185,7 +5187,7 @@ void JsExportAllDeclaration::set_source(std::unique_ptr<JsStringLiteral> source)
 
 std::optional<std::vector<std::unique_ptr<JsImportAttribute>>*> JsExportAllDeclaration::assertions() {
   if (!assertions_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &assertions_.value();
   }
@@ -5193,7 +5195,7 @@ std::optional<std::vector<std::unique_ptr<JsImportAttribute>>*> JsExportAllDecla
 
 std::optional<const std::vector<std::unique_ptr<JsImportAttribute>>*> JsExportAllDeclaration::assertions() const {
   if (!assertions_.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   } else {
     return &assertions_.value();
   }

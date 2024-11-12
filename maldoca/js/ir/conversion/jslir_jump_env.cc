@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +13,12 @@
 // limitations under the License.
 
 #include "maldoca/js/ir/conversion/jslir_jump_env.h"
+
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace maldoca {
 namespace internal {

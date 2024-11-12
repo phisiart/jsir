@@ -54,7 +54,6 @@ QuickJsBabel::QuickJsBabel()
     js_std_add_helpers(qjs_context_.get(), argc, argv);
   }
 
-
   {
     std::string babel_standalone{kBabelStandalone, sizeof(kBabelStandalone)};
 
@@ -72,8 +71,8 @@ QuickJsBabel::QuickJsBabel()
 
     QjsValue ignored{
         qjs_context_.get(),
-        JS_Eval(qjs_context_.get(), native.data(), native.size(),
-                "native.js", JS_EVAL_TYPE_GLOBAL),
+        JS_Eval(qjs_context_.get(), native.data(), native.size(), "native.js",
+                JS_EVAL_TYPE_GLOBAL),
     };
 
     CHECK(!JS_IsException(ignored.get()));

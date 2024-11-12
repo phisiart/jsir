@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,14 +72,9 @@ cc_library(
     hdrs = ["conditional_forward_dataflow_analysis.h"],
     deps = [
         ":dataflow_analysis",
-        ":state",
-        "@abseil-cpp//absl/functional:function_ref",
-        "@abseil-cpp//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
-        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -123,7 +118,6 @@ cc_library(
         "//maldoca/js/ir",
         "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/container:btree",
-        "@abseil-cpp//absl/memory",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:str_format",
         "@llvm-project//llvm:Support",

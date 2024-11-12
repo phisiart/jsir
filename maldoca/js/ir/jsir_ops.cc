@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,13 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "llvm/ADT/APSInt.h"
+// IWYU pragma: begin_keep
+
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -35,6 +35,8 @@
 #include "maldoca/js/ir/ir.h"
 #include "maldoca/js/quickjs/quickjs.h"
 #include "quickjs/quickjs.h"
+
+// IWYU pragma: end_keep
 
 #define GET_OP_CLASSES
 #include "maldoca/js/ir/jsir_ops.cc.inc"

@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,15 +20,16 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "absl/log/check.h"
 #include "maldoca/js/ir/analyses/dataflow_analysis.h"
-#include "maldoca/js/ir/analyses/scope.h"
 #include "maldoca/js/ir/ir.h"
 
 namespace maldoca {

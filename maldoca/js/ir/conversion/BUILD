@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//maldoca/js:allowed_users.bzl", "JSIR_ALLOWED_USERS")
+
 licenses(["notice"])
 
 package(
     default_applicable_licenses = ["//:license"],
-    default_visibility = [
-        "//maldoca/js:__subpackages__",
-        "//quality/malware/android/hydroid:__subpackages__",
-    ],
+    default_visibility = JSIR_ALLOWED_USERS,
 )
 
 exports_files([
@@ -84,16 +83,10 @@ cc_library(
     srcs = ["jslir_jump_env.cc"],
     hdrs = ["jslir_jump_env.h"],
     deps = [
-        "//maldoca/js/ir",
         "@abseil-cpp//absl/cleanup",
-        "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:IR",
     ],
 )

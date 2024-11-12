@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,13 @@
 # limitations under the License.
 
 load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
+load("//maldoca/js:allowed_users.bzl", "JSIR_ALLOWED_USERS")
 
 licenses(["notice"])
 
 package(
     default_applicable_licenses = ["//:license"],
-    default_visibility = [
-        "//maldoca/js:__subpackages__",
-    ],
+    default_visibility = JSIR_ALLOWED_USERS,
 )
 
 td_library(
@@ -330,6 +329,7 @@ cc_library(
     deps = [
         ":ir",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
     ],
 )
 

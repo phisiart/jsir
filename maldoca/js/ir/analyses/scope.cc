@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,16 +16,8 @@
 
 #include <cstdint>
 #include <optional>
-#include <string>
-#include <vector>
 
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Support/LogicalResult.h"
-#include "absl/base/nullability.h"
-#include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "maldoca/js/babel/babel.pb.h"
 #include "maldoca/js/ir/ir.h"

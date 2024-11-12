@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 // clang-format off
 // IWYU pragma: begin_keep
 
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -29,6 +31,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
@@ -140,7 +143,7 @@ absl::StatusOr<std::optional<std::string>>
 JsSourceLocation::GetIdentifierName(const nlohmann::json& json) {
   auto identifier_name_it = json.find("identifierName");
   if (identifier_name_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_identifier_name = identifier_name_it.value();
 
@@ -311,7 +314,7 @@ JsNode::GetLoc(const nlohmann::json& json) {
   const nlohmann::json& json_loc = loc_it.value();
 
   if (json_loc.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsSourceLocation::FromJson(json_loc);
 }
@@ -325,7 +328,7 @@ JsNode::GetStart(const nlohmann::json& json) {
   const nlohmann::json& json_start = start_it.value();
 
   if (json_start.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (!json_start.is_number_integer()) {
     return absl::InvalidArgumentError("Expecting json_start.is_number_integer().");
@@ -342,7 +345,7 @@ JsNode::GetEnd(const nlohmann::json& json) {
   const nlohmann::json& json_end = end_it.value();
 
   if (json_end.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (!json_end.is_number_integer()) {
     return absl::InvalidArgumentError("Expecting json_end.is_number_integer().");
@@ -354,7 +357,7 @@ absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsComment>>>>
 JsNode::GetLeadingComments(const nlohmann::json& json) {
   auto leading_comments_it = json.find("leadingComments");
   if (leading_comments_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_leading_comments = leading_comments_it.value();
 
@@ -380,7 +383,7 @@ absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsComment>>>>
 JsNode::GetTrailingComments(const nlohmann::json& json) {
   auto trailing_comments_it = json.find("trailingComments");
   if (trailing_comments_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_trailing_comments = trailing_comments_it.value();
 
@@ -406,7 +409,7 @@ absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsComment>>>>
 JsNode::GetInnerComments(const nlohmann::json& json) {
   auto inner_comments_it = json.find("innerComments");
   if (inner_comments_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_inner_comments = inner_comments_it.value();
 
@@ -432,7 +435,7 @@ absl::StatusOr<std::optional<int64_t>>
 JsNode::GetScopeUid(const nlohmann::json& json) {
   auto scope_uid_it = json.find("scopeUid");
   if (scope_uid_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_scope_uid = scope_uid_it.value();
 
@@ -922,7 +925,7 @@ absl::StatusOr<std::optional<std::unique_ptr<JsDirectiveLiteralExtra>>>
 JsDirectiveLiteral::GetExtra(const nlohmann::json& json) {
   auto extra_it = json.find("extra");
   if (extra_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_extra = extra_it.value();
 
@@ -1017,7 +1020,7 @@ JsProgram::GetInterpreter(const nlohmann::json& json) {
   const nlohmann::json& json_interpreter = interpreter_it.value();
 
   if (json_interpreter.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsInterpreterDirective::FromJson(json_interpreter);
 }
@@ -1645,7 +1648,7 @@ absl::StatusOr<std::optional<std::unique_ptr<JsRegExpLiteralExtra>>>
 JsRegExpLiteral::GetExtra(const nlohmann::json& json) {
   auto extra_it = json.find("extra");
   if (extra_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_extra = extra_it.value();
 
@@ -1806,7 +1809,7 @@ absl::StatusOr<std::optional<std::unique_ptr<JsStringLiteralExtra>>>
 JsStringLiteral::GetExtra(const nlohmann::json& json) {
   auto extra_it = json.find("extra");
   if (extra_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_extra = extra_it.value();
 
@@ -1968,7 +1971,7 @@ absl::StatusOr<std::optional<std::unique_ptr<JsNumericLiteralExtra>>>
 JsNumericLiteral::GetExtra(const nlohmann::json& json) {
   auto extra_it = json.find("extra");
   if (extra_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_extra = extra_it.value();
 
@@ -2083,7 +2086,7 @@ absl::StatusOr<std::optional<std::unique_ptr<JsBigIntLiteralExtra>>>
 JsBigIntLiteral::GetExtra(const nlohmann::json& json) {
   auto extra_it = json.find("extra");
   if (extra_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_extra = extra_it.value();
 
@@ -2134,7 +2137,7 @@ JsFunction::GetId(const nlohmann::json& json) {
   const nlohmann::json& json_id = id_it.value();
 
   if (json_id.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsIdentifier::FromJson(json_id);
 }
@@ -2538,7 +2541,7 @@ JsReturnStatement::GetArgument(const nlohmann::json& json) {
   const nlohmann::json& json_argument = argument_it.value();
 
   if (json_argument.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_argument);
 }
@@ -2642,7 +2645,7 @@ JsBreakStatement::GetLabel(const nlohmann::json& json) {
   const nlohmann::json& json_label = label_it.value();
 
   if (json_label.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsIdentifier::FromJson(json_label);
 }
@@ -2686,7 +2689,7 @@ JsContinueStatement::GetLabel(const nlohmann::json& json) {
   const nlohmann::json& json_label = label_it.value();
 
   if (json_label.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsIdentifier::FromJson(json_label);
 }
@@ -2758,7 +2761,7 @@ JsIfStatement::GetAlternate(const nlohmann::json& json) {
   const nlohmann::json& json_alternate = alternate_it.value();
 
   if (json_alternate.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsStatement::FromJson(json_alternate);
 }
@@ -2806,7 +2809,7 @@ JsSwitchCase::GetTest(const nlohmann::json& json) {
   const nlohmann::json& json_test = test_it.value();
 
   if (json_test.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_test);
 }
@@ -2994,7 +2997,7 @@ JsCatchClause::GetParam(const nlohmann::json& json) {
   const nlohmann::json& json_param = param_it.value();
 
   if (json_param.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsPattern::FromJson(json_param);
 }
@@ -3068,7 +3071,7 @@ JsTryStatement::GetHandler(const nlohmann::json& json) {
   const nlohmann::json& json_handler = handler_it.value();
 
   if (json_handler.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsCatchClause::FromJson(json_handler);
 }
@@ -3082,7 +3085,7 @@ JsTryStatement::GetFinalizer(const nlohmann::json& json) {
   const nlohmann::json& json_finalizer = finalizer_it.value();
 
   if (json_finalizer.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsBlockStatement::FromJson(json_finalizer);
 }
@@ -3286,7 +3289,7 @@ JsVariableDeclarator::GetInit(const nlohmann::json& json) {
   const nlohmann::json& json_init = init_it.value();
 
   if (json_init.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_init);
 }
@@ -3423,7 +3426,7 @@ JsForStatement::GetInit(const nlohmann::json& json) {
   const nlohmann::json& json_init = init_it.value();
 
   if (json_init.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (IsVariableDeclaration(json_init)) {
     return JsVariableDeclaration::FromJson(json_init);
@@ -3446,7 +3449,7 @@ JsForStatement::GetTest(const nlohmann::json& json) {
   const nlohmann::json& json_test = test_it.value();
 
   if (json_test.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_test);
 }
@@ -3460,7 +3463,7 @@ JsForStatement::GetUpdate(const nlohmann::json& json) {
   const nlohmann::json& json_update = update_it.value();
 
   if (json_update.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_update);
 }
@@ -3944,7 +3947,7 @@ JsYieldExpression::GetArgument(const nlohmann::json& json) {
   const nlohmann::json& json_argument = argument_it.value();
 
   if (json_argument.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_argument);
 }
@@ -4007,7 +4010,7 @@ JsAwaitExpression::GetArgument(const nlohmann::json& json) {
   const nlohmann::json& json_argument = argument_it.value();
 
   if (json_argument.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_argument);
 }
@@ -5584,7 +5587,7 @@ JsTemplateElementValue::GetCooked(const nlohmann::json& json) {
   const nlohmann::json& json_cooked = cooked_it.value();
 
   if (json_cooked.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (!json_cooked.is_string()) {
     return absl::InvalidArgumentError("Expecting json_cooked.is_string().");
@@ -6271,7 +6274,7 @@ absl::StatusOr<std::optional<bool>>
 JsClassPrivateMethod::GetComputed(const nlohmann::json& json) {
   auto computed_it = json.find("computed");
   if (computed_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_computed = computed_it.value();
 
@@ -6369,7 +6372,7 @@ JsClassProperty::GetValue(const nlohmann::json& json) {
   const nlohmann::json& json_value = value_it.value();
 
   if (json_value.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_value);
 }
@@ -6483,7 +6486,7 @@ JsClassPrivateProperty::GetValue(const nlohmann::json& json) {
   const nlohmann::json& json_value = value_it.value();
 
   if (json_value.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_value);
 }
@@ -6618,7 +6621,7 @@ JsClass::GetSuperClass(const nlohmann::json& json) {
   const nlohmann::json& json_super_class = super_class_it.value();
 
   if (json_super_class.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsExpression::FromJson(json_super_class);
 }
@@ -6682,7 +6685,7 @@ JsClassDeclaration::GetId(const nlohmann::json& json) {
   const nlohmann::json& json_id = id_it.value();
 
   if (json_id.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsIdentifier::FromJson(json_id);
 }
@@ -6730,7 +6733,7 @@ JsClassExpression::GetId(const nlohmann::json& json) {
   const nlohmann::json& json_id = id_it.value();
 
   if (json_id.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsIdentifier::FromJson(json_id);
 }
@@ -7174,7 +7177,7 @@ absl::StatusOr<std::optional<std::unique_ptr<JsImportAttribute>>>
 JsImportDeclaration::GetAssertions(const nlohmann::json& json) {
   auto assertions_it = json.find("assertions");
   if (assertions_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_assertions = assertions_it.value();
 
@@ -7245,7 +7248,7 @@ absl::StatusOr<std::optional<std::variant<std::unique_ptr<JsIdentifier>, std::un
 JsExportSpecifier::GetLocal(const nlohmann::json& json) {
   auto local_it = json.find("local");
   if (local_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_local = local_it.value();
 
@@ -7305,7 +7308,7 @@ JsExportNamedDeclaration::GetDeclaration(const nlohmann::json& json) {
   const nlohmann::json& json_declaration = declaration_it.value();
 
   if (json_declaration.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsDeclaration::FromJson(json_declaration);
 }
@@ -7345,7 +7348,7 @@ JsExportNamedDeclaration::GetSource(const nlohmann::json& json) {
   const nlohmann::json& json_source = source_it.value();
 
   if (json_source.is_null()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return JsStringLiteral::FromJson(json_source);
 }
@@ -7354,7 +7357,7 @@ absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsImportAttribute>>>>
 JsExportNamedDeclaration::GetAssertions(const nlohmann::json& json) {
   auto assertions_it = json.find("assertions");
   if (assertions_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_assertions = assertions_it.value();
 
@@ -7485,7 +7488,7 @@ absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsImportAttribute>>>>
 JsExportAllDeclaration::GetAssertions(const nlohmann::json& json) {
   auto assertions_it = json.find("assertions");
   if (assertions_it == json.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const nlohmann::json& json_assertions = assertions_it.value();
 

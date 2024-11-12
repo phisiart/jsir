@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,23 +14,12 @@
 
 #include "maldoca/js/ir/jsir_gen_lib.h"
 
-#include <cstddef>
 #include <memory>
-#include <optional>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "google/protobuf/duration.pb.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/raw_ostream.h"
-#include "mlir/Analysis/DataFlowFramework.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/AsmState.h"
-#include "mlir/IR/OwningOpRef.h"
-#include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Support/LogicalResult.h"
@@ -40,11 +29,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/time/time.h"
 #include "maldoca/base/ret_check.h"
-#include "maldoca/base/status_macros.h"
-#include "maldoca/js/ast/ast.generated.h"
-#include "maldoca/js/ast/ast_util.h"
 #include "maldoca/js/babel/babel.h"
 #include "maldoca/js/babel/babel.pb.h"
 #include "maldoca/js/driver/driver.h"

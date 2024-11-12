@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,26 +14,33 @@
 
 #include "maldoca/js/ir/ir.h"
 
+// IWYU pragma: begin_keep
+
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/Region.h"
+
+// IWYU pragma: end_keep
 
 // =============================================================================
 // Dialect Definition
 // =============================================================================
 
-#include "maldoca/js/ir/jsir_dialect.cc.inc"
 #include "maldoca/js/ir/jshir_dialect.cc.inc"
+#include "maldoca/js/ir/jsir_dialect.cc.inc"
 #include "maldoca/js/ir/jslir_dialect.cc.inc"
 
 // Dialect initialization, the instance will be owned by the context. This is
