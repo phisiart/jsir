@@ -21,6 +21,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/Value.h"
 #include "maldoca/js/ir/ir.h"
 #include "maldoca/js/ir/jslir_visitor.h"
 
@@ -337,7 +338,7 @@ class JslirToJshir : public JslirVisitor<mlir::Operation *> {
   //   ...  <------------------------------------------------------ return value
   mlir::Operation *VisitForInOfStatementStart(
       mlir::Operation *lir_op, mlir::Value lir_iterator, JsirForInOfKind kind,
-      mlir::StringAttr left_declaration_kind, mlir::Value lir_left_lval,
+      JsirForInOfDeclarationAttr left_declaration, mlir::Value lir_left_lval,
       mlir::Value lir_right, std::optional<bool> await);
 
   mlir::Operation *VisitForInStatementStart(

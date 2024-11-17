@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <optional>
 
+#include "llvm/Support/Casting.h"
 #include "mlir/IR/Operation.h"
 #include "absl/strings/string_view.h"
 #include "maldoca/js/babel/babel.pb.h"
@@ -52,16 +53,16 @@ std::optional<int64_t> FindSymbol(const BabelScopes &scopes, int64_t scope_uid,
 
 std::optional<int64_t> FindSymbol(const BabelScopes &scopes,
                                   mlir::Operation *op, absl::string_view name) {
-  auto loc = op->getLoc().dyn_cast<JsirCommentsAndLocationAttr>();
-  if (loc == nullptr) {
+  auto trivia = llvm::dyn_cast<JsirTriviaAttr>(op->getLoc());
+  if (trivia == nullptr) {
     return std::nullopt;
   }
 
-  if (!loc.getLoc().getScopeUid().has_value()) {
+  if (!trivia.getLoc().getScopeUid().has_value()) {
     return std::nullopt;
   }
 
-  return FindSymbol(scopes, *loc.getLoc().getScopeUid(), name);
+  return FindSymbol(scopes, *trivia.getLoc().getScopeUid(), name);
 }
 
 JsirSymbolId GetSymbolId(const BabelScopes &scopes, int64_t scope_uid,
@@ -84,11 +85,11 @@ JsirSymbolId GetSymbolId(const BabelScopes &scopes, JsirIdentifierRefOp op) {
 
 JsirSymbolId GetSymbolId(const BabelScopes &scopes, JsirIdentifierAttr attr) {
   int64_t scope_uid = [&]() -> int64_t {
-    JsirCommentsAndLocationAttr loc = attr.getLoc();
-    if (loc == nullptr) {
+    JsirTriviaAttr trivia = attr.getLoc();
+    if (trivia == nullptr) {
       return 0;
     }
-    return loc.getLoc().getScopeUid().value_or(0);
+    return trivia.getLoc().getScopeUid().value_or(0);
   }();
 
   return GetSymbolId(scopes, scope_uid, attr.getName().strref());

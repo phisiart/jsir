@@ -16,32 +16,25 @@
 #define MALDOCA_JS_IR_CONVERSION_JSHIR_TO_JSLIR_H_
 
 #include <cstddef>
-#include <iostream>
-#include <memory>
 #include <optional>
-#include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/ilist.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Region.h"
-#include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 #include "absl/functional/function_ref.h"
 #include "absl/log/check.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "maldoca/js/ir/conversion/jslir_jump_env.h"
 #include "maldoca/js/ir/ir.h"
@@ -404,7 +397,7 @@ class JshirToJslir {
   void VisitForStatementOp(JshirForStatementOp hir_op);
 
   void VisitForInOfStatementOp(mlir::Operation *hir_op, JsirForInOfKind kind,
-                               mlir::StringAttr declration_kind,
+                               JsirForInOfDeclarationAttr left_declaration,
                                mlir::Value hir_left, mlir::Value hir_right,
                                std::optional<bool> await,
                                mlir::Region &hir_body);

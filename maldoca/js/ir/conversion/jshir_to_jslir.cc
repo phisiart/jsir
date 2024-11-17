@@ -15,17 +15,18 @@
 #include "maldoca/js/ir/conversion/jshir_to_jslir.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <utility>
 #include <vector>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Location.h"
@@ -740,7 +741,7 @@ void JshirToJslir::VisitForStatementOp(JshirForStatementOp hir_op) {
 
 void JshirToJslir::VisitForInOfStatementOp(
     mlir::Operation *hir_op, JsirForInOfKind kind,
-    mlir::StringAttr declration_kind, mlir::Value hir_left_lval,
+    JsirForInOfDeclarationAttr left_declaration, mlir::Value hir_left_lval,
     mlir::Value hir_right, std::optional<bool> await, mlir::Region &hir_body) {
   mlir::Block *lir_start_block = builder_.getBlock();
   mlir::Block *lir_next_block = CreateBlockAfter(lir_start_block);
@@ -760,7 +761,7 @@ void JshirToJslir::VisitForInOfStatementOp(
   switch (kind) {
     case JsirForInOfKind::ForIn: {
       iterator = CreateExpr<JslirForInStatementStartOp>(
-          hir_op, declration_kind, lir_left_lval, lir_right);
+          hir_op, left_declaration, lir_left_lval, lir_right);
       break;
     }
     case JsirForInOfKind::ForOf: {
@@ -770,7 +771,7 @@ void JshirToJslir::VisitForInOfStatementOp(
       }
 
       iterator = CreateExpr<JslirForOfStatementStartOp>(
-          hir_op, declration_kind, lir_left_lval, lir_right, await.value());
+          hir_op, left_declaration, lir_left_lval, lir_right, await.value());
       break;
     }
   }
@@ -801,14 +802,14 @@ void JshirToJslir::VisitForInOfStatementOp(
 
 void JshirToJslir::VisitForInStatementOp(JshirForInStatementOp hir_op) {
   return VisitForInOfStatementOp(hir_op, JsirForInOfKind::ForIn,
-                                 hir_op.getLeftDeclarationKindAttr(),
+                                 hir_op.getLeftDeclarationAttr(),
                                  hir_op.getLeftLval(), hir_op.getRight(),
                                  /*await=*/std::nullopt, hir_op.getBody());
 }
 
 void JshirToJslir::VisitForOfStatementOp(JshirForOfStatementOp hir_op) {
   return VisitForInOfStatementOp(hir_op, JsirForInOfKind::ForOf,
-                                 hir_op.getLeftDeclarationKindAttr(),
+                                 hir_op.getLeftDeclarationAttr(),
                                  hir_op.getLeftLval(), hir_op.getRight(),
                                  hir_op.getAwait(), hir_op.getBody());
 }

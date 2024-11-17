@@ -36,15 +36,15 @@ cc_library(
     deps = [
         "//maldoca/js/ast",
         "//maldoca/js/ir",
+        "//maldoca/js/ir:trivia",
         "@abseil-cpp//absl/cleanup",
-        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:variant",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:IR",
     ],
 )
@@ -59,11 +59,11 @@ cc_library(
         "jsir_to_ast.h",
     ],
     deps = [
-        ":jsir_to_ast_utils",
         "//maldoca/base:status",
         "//maldoca/js/ast",
         "//maldoca/js/ir",
         "//maldoca/js/ir:cast",
+        "//maldoca/js/ir:trivia",
         "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/log:check",
@@ -103,11 +103,8 @@ cc_library(
         ":jslir_jump_env",
         "//maldoca/js/ast",
         "//maldoca/js/ir",
-        "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/log:check",
-        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:optional",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowDialect",
@@ -154,20 +151,6 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
-        "@llvm-project//mlir:IR",
-    ],
-)
-
-cc_library(
-    name = "jsir_to_ast_utils",
-    srcs = ["jsir_to_ast_utils.cc"],
-    hdrs = ["jsir_to_ast_utils.h"],
-    deps = [
-        "//maldoca/js/ast",
-        "//maldoca/js/ir",
-        "@abseil-cpp//absl/log",
-        "@abseil-cpp//absl/memory",
-        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
 )

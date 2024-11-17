@@ -247,9 +247,9 @@ def JsirCommentAttr : AttrDef<Jsir_Dialect, "JsirComment", []> {
   let assemblyFormat = "params";
 }
 
-def JsirCommentsAndLocationAttr : AttrDef<Jsir_Dialect, "JsirCommentsAndLocation", [],
-                                          "::mlir::LocationAttr"> {
-  let mnemonic = "comment_and_location";
+def JsirTriviaAttr : AttrDef<Jsir_Dialect, "JsirTrivia", [],
+                             "::mlir::LocationAttr"> {
+  let mnemonic = "trivia";
   let parameters = (
     ins
       OptionalParameter<"JsirLocationAttr">: $loc,
@@ -263,7 +263,7 @@ def JsirCommentsAndLocationAttr : AttrDef<Jsir_Dialect, "JsirCommentsAndLocation
 def JsirInterpreterDirectiveAttr : AttrDef<Jsir_Dialect, "JsirInterpreterDirective", []> {
   let mnemonic = "interpreter_directive";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     "::mlir::StringAttr": $value
   );
   let assemblyFormat = "params";
@@ -282,7 +282,7 @@ def JsirDirectiveLiteralExtraAttr : AttrDef<Jsir_Dialect,
 def JsirIdentifierAttr : AttrDef<Jsir_Dialect, "JsirIdentifier", []> {
   let mnemonic = "identifier";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     "::mlir::StringAttr": $name
   );
   let assemblyFormat = "params";
@@ -291,7 +291,7 @@ def JsirIdentifierAttr : AttrDef<Jsir_Dialect, "JsirIdentifier", []> {
 def JsirPrivateNameAttr : AttrDef<Jsir_Dialect, "JsirPrivateName", []> {
   let mnemonic = "private_name";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     JsirIdentifierAttr: $id
   );
   let assemblyFormat = "params";
@@ -332,7 +332,7 @@ def JsirStringLiteralExtraAttr : AttrDef<Jsir_Dialect,
 def JsirStringLiteralAttr : AttrDef<Jsir_Dialect, "JsirStringLiteral", []> {
   let mnemonic = "string_literal";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     "::mlir::StringAttr": $value,
     JsirStringLiteralExtraAttr: $extra
   );
@@ -352,7 +352,7 @@ def JsirNumericLiteralExtraAttr : AttrDef<Jsir_Dialect,
 def JsirNumericLiteralAttr : AttrDef<Jsir_Dialect, "JsirNumericLiteral", []> {
   let mnemonic = "numeric_literal";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     "::mlir::FloatAttr": $value,
     JsirNumericLiteralExtraAttr: $extra
   );
@@ -378,13 +378,34 @@ def JsirBigIntLiteralAttr : AttrDef<Jsir_Dialect, "JsirBigIntLiteral", []> {
   let assemblyFormat = "params";
 }
 
+// ```
+// for (let a in b) ...
+//      ~~~~~
+// ```
+//
+// `let a` is a `JsVariableDeclaration { JsVariableDeclarator { JsLVal }}` in
+// the original AST, but we only store the `JsLVal` part in the IR, which means
+// we lose the JsTrivia (source location, comments, etc.) information.
+//
+// Therefore, we add `declaration_loc` and `declarator_loc` to store that.
+def JsirForInOfDeclarationAttr : AttrDef<Jsir_Dialect,
+                                         "JsirForInOfDeclaration", []> {
+  let mnemonic = "for_in_of_declaration";
+  let parameters = (ins
+    "JsirTriviaAttr": $declaration_loc,
+    "JsirTriviaAttr": $declarator_loc,
+    "::mlir::StringAttr": $kind
+  );
+  let assemblyFormat = "params";
+}
+
 def JsirImportSpecifierAttr : AttrDef<
     Jsir_Dialect, "JsirImportSpecifier", [
         DeclareAttrInterfaceMethods<JsirModuleSpecifierAttrInterface>
     ]> {
   let mnemonic = "import_specifier";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     "::mlir::Attribute": $imported,
     JsirIdentifierAttr: $local
   );
@@ -397,7 +418,7 @@ def JsirImportDefaultSpecifierAttr : AttrDef<
     ]> {
   let mnemonic = "import_default_specifier";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     JsirIdentifierAttr: $local
   );
   let assemblyFormat = "params";
@@ -409,7 +430,7 @@ def JsirImportNamespaceSpecifierAttr : AttrDef<
     ]> {
   let mnemonic = "import_namespace_specifier";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     JsirIdentifierAttr: $local
   );
   let assemblyFormat = "params";
@@ -430,7 +451,7 @@ def JsirExportSpecifierAttr : AttrDef<
     ]> {
   let mnemonic = "export_specifier";
   let parameters = (ins
-    "JsirCommentsAndLocationAttr": $loc,
+    "JsirTriviaAttr": $loc,
     "::mlir::Attribute": $exported,
     "::mlir::Attribute": $local
   );

@@ -296,6 +296,23 @@ cc_library(
 )
 
 cc_library(
+    name = "trivia",
+    srcs = ["trivia.cc"],
+    hdrs = ["trivia.h"],
+    deps = [
+        ":ir",
+        "//maldoca/js/ast",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:span",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_library(
     name = "cast",
     hdrs = ["cast.h"],
     deps = [

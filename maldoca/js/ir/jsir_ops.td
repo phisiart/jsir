@@ -579,7 +579,7 @@ def JshirForInStatementOp : Jshir_Op<
         NoTerminator
     ]> {
   let arguments = (ins
-    OptionalAttr<StrAttr>: $left_declaration_kind,
+    OptionalAttr<JsirForInOfDeclarationAttr>: $left_declaration,
     AnyType: $left_lval,  // JsLVal
     AnyType: $right  // JsExpression
   );
@@ -595,7 +595,7 @@ def JshirForOfStatementOp : Jshir_Op<
         NoTerminator
     ]> {
   let arguments = (ins
-    OptionalAttr<StrAttr>: $left_declaration_kind,
+    OptionalAttr<JsirForInOfDeclarationAttr>: $left_declaration,
     AnyType: $left_lval,  // JsLVal
     AnyType: $right,  // JsExpression
     BoolAttr: $await
@@ -611,7 +611,7 @@ def JslirForInStatementStartOp : Jslir_Op<
         JsirStatementOpInterfaceTraits
     ]> {
   let arguments = (ins
-    OptionalAttr<StrAttr>: $left_declaration_kind,
+    OptionalAttr<JsirForInOfDeclarationAttr>: $left_declaration,
     AnyType: $left_lval,
     AnyType: $right
   );
@@ -626,7 +626,7 @@ def JslirForOfStatementStartOp : Jslir_Op<
         JsirStatementOpInterfaceTraits
     ]> {
   let arguments = (ins
-    OptionalAttr<StrAttr>: $left_declaration_kind,
+    OptionalAttr<JsirForInOfDeclarationAttr>: $left_declaration,
     AnyType: $left_lval,
     AnyType: $right,
     BoolAttr: $await

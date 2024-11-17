@@ -19,24 +19,19 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include <type_traits>
 #include <variant>
 #include <vector>
 
-#include "llvm/ADT/DenseMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/Location.h"
-#include "mlir/IR/Operation.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Region.h"
-#include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
-#include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "maldoca/js/ast/ast.generated.h"
 #include "maldoca/js/ir/ir.h"
+#include "maldoca/js/ir/trivia.h"
 
 namespace maldoca {
 
@@ -102,7 +97,7 @@ class AstToJsir {
                                        std::optional<int64_t> start,
                                        std::optional<int64_t> end,
                                        std::optional<int64_t> scope_uid);
-  JsirCommentsAndLocationAttr GetMlirLocation(const JsNode &node);
+
   std::vector<JsirCommentAttr> GetMlirCommentsFromJsComments(
       std::optional<const std::vector<std::unique_ptr<JsComment>> *>
           js_comments,
@@ -111,7 +106,8 @@ class AstToJsir {
   template <typename T, typename... Args>
   T CreateExpr(const JsNode *node, Args &&...args) {
     CHECK(node != nullptr) << "Node cannot be null.";
-    return builder_.create<T>(GetMlirLocation(*node),
+    mlir::MLIRContext *context = builder_.getContext();
+    return builder_.create<T>(GetJsirTriviaAttr(context, *node),
                               std::forward<Args>(args)...);
   }
 
@@ -127,7 +123,8 @@ class AstToJsir {
   template <typename T, typename... Args>
   T CreateStmt(const JsNode *node, Args &&...args) {
     CHECK(node != nullptr) << "Node cannot be null.";
-    return builder_.create<T>(GetMlirLocation(*node), std::nullopt,
+    mlir::MLIRContext *context = builder_.getContext();
+    return builder_.create<T>(GetJsirTriviaAttr(context, *node), std::nullopt,
                               std::forward<Args>(args)...);
   }
 

@@ -38,6 +38,7 @@
 #include "maldoca/js/ast/ast.generated.h"
 #include "maldoca/js/ir/cast.h"
 #include "maldoca/js/ir/ir.h"
+#include "maldoca/js/ir/trivia.h"
 
 namespace maldoca {
 
@@ -98,7 +99,7 @@ JsirToAst::VisitNumericLiteralAttr(JsirNumericLiteralAttr attr) {
 absl::StatusOr<std::unique_ptr<JsBigIntLiteralExtra>>
 JsirToAst::VisitBigIntLiteralExtraAttr(JsirBigIntLiteralExtraAttr attr) {
   return Create<JsBigIntLiteralExtra>(attr, attr.getRaw().str(),
-                                      attr.getRaw().str());
+                                      attr.getRawValue().str());
 }
 
 absl::StatusOr<std::unique_ptr<JsBigIntLiteral>>
@@ -155,7 +156,7 @@ absl::StatusOr<std::unique_ptr<JsForStatement>> JsirToAst::VisitForStatement(
 
 absl::StatusOr<JsirToAst::JsForInOfStatementFields>
 JsirToAst::VisitForInOfStatement(
-    std::optional<llvm::StringRef> left_declaration_kind,
+    std::optional<JsirForInOfDeclarationAttr> left_declaration,
     mlir::Value left_lval_value, mlir::Value right_value,
     mlir::Region &body_region) {
   MALDOCA_ASSIGN_OR_RETURN(auto left_lval_op,
@@ -164,18 +165,20 @@ JsirToAst::VisitForInOfStatement(
 
   std::variant<std::unique_ptr<JsVariableDeclaration>, std::unique_ptr<JsLVal>>
       left;
-  if (!left_declaration_kind.has_value()) {
+  if (!left_declaration.has_value()) {
     left = std::move(left_lval);
   } else {
-    auto declarator = Create<JsVariableDeclarator>(
-        left_lval_op, std::move(left_lval), /*init=*/std::nullopt);
+    auto declarator = CreateJsNodeWithTrivia<JsVariableDeclarator>(
+        left_declaration->getDeclaratorLoc(), std::move(left_lval),
+        /*init=*/std::nullopt);
 
     std::vector<std::unique_ptr<JsVariableDeclarator>> declarations;
     declarations.push_back(std::move(declarator));
 
     std::string kind;
-    left = Create<JsVariableDeclaration>(left_lval_op, std::move(declarations),
-                                         left_declaration_kind->str());
+    left = CreateJsNodeWithTrivia<JsVariableDeclaration>(
+        left_declaration->getDeclarationLoc(), std::move(declarations),
+        left_declaration->getKind().str());
   }
 
   MALDOCA_ASSIGN_OR_RETURN(auto right_op,
@@ -193,7 +196,7 @@ absl::StatusOr<std::unique_ptr<JsForInStatement>>
 JsirToAst::VisitForInStatement(JshirForInStatementOp op) {
   MALDOCA_ASSIGN_OR_RETURN(
       auto fields,
-      VisitForInOfStatement(op.getLeftDeclarationKind(), op.getLeftLval(),
+      VisitForInOfStatement(op.getLeftDeclaration(), op.getLeftLval(),
                             op.getRight(), op.getBody()));
   return Create<JsForInStatement>(op, std::move(fields.left),
                                   std::move(fields.right),
@@ -204,7 +207,7 @@ absl::StatusOr<std::unique_ptr<JsForOfStatement>>
 JsirToAst::VisitForOfStatement(JshirForOfStatementOp op) {
   MALDOCA_ASSIGN_OR_RETURN(
       auto fields,
-      VisitForInOfStatement(op.getLeftDeclarationKind(), op.getLeftLval(),
+      VisitForInOfStatement(op.getLeftDeclaration(), op.getLeftLval(),
                             op.getRight(), op.getBody()));
   return Create<JsForOfStatement>(op, std::move(fields.left),
                                   std::move(fields.right),

@@ -22,7 +22,6 @@
 #include <variant>
 #include <vector>
 
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -40,8 +39,8 @@
 #include "absl/types/optional.h"
 #include "maldoca/base/status_macros.h"
 #include "maldoca/js/ast/ast.generated.h"
-#include "maldoca/js/ir/conversion/jsir_to_ast_utils.h"
 #include "maldoca/js/ir/ir.h"
+#include "maldoca/js/ir/trivia.h"
 
 namespace maldoca {
 
@@ -119,7 +118,7 @@ class JsirToAst {
   };
 
   absl::StatusOr<JsForInOfStatementFields> VisitForInOfStatement(
-      std::optional<llvm::StringRef> left_declaration_kind,
+      std::optional<JsirForInOfDeclarationAttr> left_declaration,
       mlir::Value left_lval, mlir::Value right, mlir::Region &body_region);
 
   absl::StatusOr<std::unique_ptr<JsModuleSpecifier>> VisitModuleSpecifierAttr(
@@ -131,15 +130,9 @@ class JsirToAst {
             typename... Args>
   std::unique_ptr<NodeT> Create(IrT op, Args &&...args) {
     CHECK(op != nullptr) << "Op cannot be null.";
-    auto loc_info = GetAstLocationFromIr(op);
-    return absl::make_unique<NodeT>(
-        /*loc=*/std::move(loc_info.loc),
-        /*start=*/loc_info.start,
-        /*end=*/loc_info.end,
-        /*leading_comments=*/std::move(loc_info.leading_comments),
-        /*trailing_comments=*/std::move(loc_info.trailing_comments),
-        /*inner_comments=*/std::move(loc_info.inner_comments),
-        /*scope_uid=*/loc_info.scope_uid, std::forward<Args>(args)...);
+    JsTrivia trivia = GetJsTrivia(op);
+    return CreateJsNodeWithTrivia<NodeT>(std::move(trivia),
+                                         std::forward<Args>(args)...);
   }
 
   template <typename NodeT, typename IrT,

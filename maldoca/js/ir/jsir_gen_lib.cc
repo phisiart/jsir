@@ -21,8 +21,6 @@
 
 #include "google/protobuf/duration.pb.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Support/LogicalResult.h"
 #include "absl/algorithm/container.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
@@ -34,13 +32,7 @@
 #include "maldoca/js/babel/babel.pb.h"
 #include "maldoca/js/driver/driver.h"
 #include "maldoca/js/driver/driver.pb.h"
-#include "maldoca/js/ir/analyses/analysis.h"
-#include "maldoca/js/ir/analyses/conditional_forward_dataflow_analysis.h"
-#include "maldoca/js/ir/analyses/constant_propagation/analysis.h"
-#include "maldoca/js/ir/analyses/dataflow_analysis.h"
 #include "maldoca/js/ir/conversion/utils.h"
-#include "maldoca/js/ir/ir.h"
-#include "maldoca/js/ir/transforms/transform.h"
 #include "maldoca/js/quickjs_babel/quickjs_babel.h"
 
 namespace maldoca {

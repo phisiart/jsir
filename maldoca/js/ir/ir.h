@@ -31,7 +31,6 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "absl/log/log.h"
 #include "maldoca/js/quickjs/quickjs.h"
 #include "quickjs/quickjs.h"
 

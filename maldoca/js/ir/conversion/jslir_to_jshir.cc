@@ -14,7 +14,7 @@
 
 #include "maldoca/js/ir/conversion/jslir_to_jshir.h"
 
-#include <cstdint>
+#include <cstddef>
 #include <optional>
 #include <vector>
 
@@ -23,6 +23,7 @@
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"
@@ -34,6 +35,7 @@
 #include "absl/status/statusor.h"
 #include "maldoca/base/status_macros.h"
 #include "maldoca/js/ir/ir.h"
+#include "maldoca/js/ir/jslir_visitor.h"
 
 namespace maldoca {
 
@@ -560,7 +562,7 @@ mlir::Operation *JslirToJshir::VisitForStatementStart(
 
 mlir::Operation *JslirToJshir::VisitForInOfStatementStart(
     mlir::Operation *lir_op, mlir::Value lir_iterator, JsirForInOfKind kind,
-    mlir::StringAttr left_declaration_kind, mlir::Value lir_left_lval,
+    JsirForInOfDeclarationAttr left_declaration, mlir::Value lir_left_lval,
     mlir::Value lir_right, std::optional<bool> await) {
   mlir::Value hir_left_lval = lir_to_hir_mappings_.lookup(lir_left_lval);
   mlir::Value hir_right = lir_to_hir_mappings_.lookup(lir_right);
@@ -599,7 +601,7 @@ mlir::Operation *JslirToJshir::VisitForInOfStatementStart(
   switch (kind) {
     case JsirForInOfKind::ForIn: {
       auto hir_op = builder_->create<JshirForInStatementOp>(
-          lir_op->getLoc(), left_declaration_kind, hir_left_lval, hir_right);
+          lir_op->getLoc(), left_declaration, hir_left_lval, hir_right);
       hir_body_region = &hir_op.getBody();
       break;
     }
@@ -610,7 +612,7 @@ mlir::Operation *JslirToJshir::VisitForInOfStatementStart(
       }
 
       auto hir_op = builder_->create<JshirForOfStatementOp>(
-          lir_op->getLoc(), left_declaration_kind, hir_left_lval, hir_right,
+          lir_op->getLoc(), left_declaration, hir_left_lval, hir_right,
           await.value());
       hir_body_region = &hir_op.getBody();
       break;
@@ -631,16 +633,16 @@ mlir::Operation *JslirToJshir::VisitForInStatementStart(
     JslirForInStatementStartOp lir_op) {
   return VisitForInOfStatementStart(
       lir_op, lir_op.getIterator(), JsirForInOfKind::ForIn,
-      lir_op.getLeftDeclarationKindAttr(), lir_op.getLeftLval(),
-      lir_op.getRight(), /*await=*/std::nullopt);
+      lir_op.getLeftDeclarationAttr(), lir_op.getLeftLval(), lir_op.getRight(),
+      /*await=*/std::nullopt);
 }
 
 mlir::Operation *JslirToJshir::VisitForOfStatementStart(
     JslirForOfStatementStartOp lir_op) {
   return VisitForInOfStatementStart(
       lir_op, lir_op.getIterator(), JsirForInOfKind::ForOf,
-      lir_op.getLeftDeclarationKindAttr(), lir_op.getLeftLval(),
-      lir_op.getRight(), lir_op.getAwait());
+      lir_op.getLeftDeclarationAttr(), lir_op.getLeftLval(), lir_op.getRight(),
+      lir_op.getAwait());
 }
 
 mlir::Operation *JslirToJshir::VisitLogicalExpressionStart(

@@ -14,41 +14,36 @@
 
 #include "maldoca/js/ir/conversion/ast_to_jsir.h"
 
-#include <algorithm>
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
-#include <utility>
 #include <variant>
 #include <vector>
 
-#include "llvm/ADT/APFloat.h"
-#include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Operation.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
-#include "absl/cleanup/cleanup.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "maldoca/js/ast/ast.generated.h"
 #include "maldoca/js/ir/ir.h"
+#include "maldoca/js/ir/trivia.h"
 
 namespace maldoca {
 
 JsirInterpreterDirectiveAttr AstToJsir::VisitInterpreterDirectiveAttr(
     const JsInterpreterDirective *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   mlir::StringAttr mlir_value = builder_.getStringAttr(node->value());
   return JsirInterpreterDirectiveAttr::get(builder_.getContext(), loc,
                                            mlir_value);
@@ -63,13 +58,13 @@ JsirDirectiveLiteralExtraAttr AstToJsir::VisitDirectiveLiteralExtraAttr(
 }
 
 JsirIdentifierAttr AstToJsir::VisitIdentifierAttr(const JsIdentifier *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   mlir::StringAttr mlir_name = builder_.getStringAttr(node->name());
   return JsirIdentifierAttr::get(builder_.getContext(), loc, mlir_name);
 }
 
 JsirPrivateNameAttr AstToJsir::VisitPrivateNameAttr(const JsPrivateName *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   JsirIdentifierAttr mlir_id = VisitIdentifierAttr(node->id());
   return JsirPrivateNameAttr::get(builder_.getContext(), loc, mlir_id);
 }
@@ -90,7 +85,7 @@ JsirStringLiteralExtraAttr AstToJsir::VisitStringLiteralExtraAttr(
 
 JsirStringLiteralAttr AstToJsir::VisitStringLiteralAttr(
     const JsStringLiteral *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   mlir::StringAttr mlir_value = builder_.getStringAttr(node->value());
   JsirStringLiteralExtraAttr mlir_extra;
   if (node->extra().has_value()) {
@@ -110,7 +105,7 @@ JsirNumericLiteralExtraAttr AstToJsir::VisitNumericLiteralExtraAttr(
 
 JsirNumericLiteralAttr AstToJsir::VisitNumericLiteralAttr(
     const JsNumericLiteral *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   mlir::FloatAttr mlir_value = builder_.getF64FloatAttr(node->value());
   JsirNumericLiteralExtraAttr mlir_extra;
   if (node->extra().has_value()) {
@@ -196,52 +191,58 @@ JshirForStatementOp AstToJsir::VisitForStatement(const JsForStatement *node) {
 }
 
 struct ForInOfLeft {
-  std::optional<absl::string_view> declaration_kind;
+  std::optional<JsirForInOfDeclarationAttr> declaration_attr;
   const JsLVal *lval;
 };
 
 static absl::StatusOr<ForInOfLeft> GetForInOfLeft(
+    mlir::MLIRContext *context,
     std::variant<const JsVariableDeclaration *, const JsLVal *> left) {
   if (std::holds_alternative<const JsLVal *>(left)) {
     auto *left_lval = std::get<const JsLVal *>(left);
 
-    return ForInOfLeft{std::nullopt, left_lval};
+    return ForInOfLeft{
+        .declaration_attr = std::nullopt,
+        .lval = left_lval,
+    };
   }
 
   CHECK(std::holds_alternative<const JsVariableDeclaration *>(left))
       << "Exhausted std::variant case.";
-  auto *left_variable_declaration =
-      std::get<const JsVariableDeclaration *>(left);
+  auto *left_declaration = std::get<const JsVariableDeclaration *>(left);
 
-  auto *declarators = left_variable_declaration->declarations();
+  auto *declarators = left_declaration->declarations();
   if (auto num_declarators = declarators->size(); num_declarators != 1) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Expected exactly 1 declarator, got ", num_declarators, "."));
   }
   JsVariableDeclarator *declarator = declarators->front().get();
 
-  return ForInOfLeft{left_variable_declaration->kind(), declarator->id()};
+  return ForInOfLeft{
+      .declaration_attr = JsirForInOfDeclarationAttr::get(
+          context,
+          /*declaration_loc=*/GetJsirTriviaAttr(context, *left_declaration),
+          /*declarator_loc=*/GetJsirTriviaAttr(context, *declarator),
+          /*kind=*/mlir::StringAttr::get(context, left_declaration->kind())),
+      .lval = declarator->id(),
+  };
 }
 
 JshirForInStatementOp AstToJsir::VisitForInStatement(
     const JsForInStatement *node) {
-  auto left = GetForInOfLeft(node->left());
+  auto left = GetForInOfLeft(builder_.getContext(), node->left());
   if (!left.ok()) {
-    mlir::emitError(GetMlirLocation(*node), left.status().ToString());
+    mlir::emitError(GetJsirTriviaAttr(builder_.getContext(), *node),
+                    left.status().ToString());
     return nullptr;
-  }
-
-  mlir::StringAttr mlir_declaration_kind = nullptr;
-  if (left->declaration_kind.has_value()) {
-    mlir_declaration_kind = builder_.getStringAttr(*left->declaration_kind);
   }
 
   mlir::Value mlir_left = VisitLValRef(left->lval);
 
   mlir::Value mlir_right = VisitExpression(node->right());
 
-  auto op = CreateStmt<JshirForInStatementOp>(node, mlir_declaration_kind,
-                                              mlir_left, mlir_right);
+  auto op = CreateStmt<JshirForInStatementOp>(
+      node, left->declaration_attr.value_or(nullptr), mlir_left, mlir_right);
 
   mlir::Region &body_region = op.getBody();
   AppendNewBlockAndPopulate(body_region, [&] { VisitStatement(node->body()); });
@@ -250,15 +251,11 @@ JshirForInStatementOp AstToJsir::VisitForInStatement(
 
 JshirForOfStatementOp AstToJsir::VisitForOfStatement(
     const JsForOfStatement *node) {
-  auto left = GetForInOfLeft(node->left());
+  auto left = GetForInOfLeft(builder_.getContext(), node->left());
   if (!left.ok()) {
-    mlir::emitError(GetMlirLocation(*node), left.status().ToString());
+    mlir::emitError(GetJsirTriviaAttr(builder_.getContext(), *node),
+                    left.status().ToString());
     return nullptr;
-  }
-
-  mlir::StringAttr mlir_declaration_kind = nullptr;
-  if (left->declaration_kind.has_value()) {
-    mlir_declaration_kind = builder_.getStringAttr(*left->declaration_kind);
   }
 
   mlir::BoolAttr mlir_await = builder_.getBoolAttr(node->await());
@@ -268,7 +265,8 @@ JshirForOfStatementOp AstToJsir::VisitForOfStatement(
   mlir::Value mlir_right = VisitExpression(node->right());
 
   auto op = CreateStmt<JshirForOfStatementOp>(
-      node, mlir_declaration_kind, mlir_left, mlir_right, mlir_await);
+      node, left->declaration_attr.value_or(nullptr), mlir_left, mlir_right,
+      mlir_await);
 
   mlir::Region &body_region = op.getBody();
   AppendNewBlockAndPopulate(body_region, [&] { VisitStatement(node->body()); });
@@ -479,7 +477,8 @@ JsirParenthesizedExpressionRefOp AstToJsir::VisitParenthesizedExpressionRef(
       return VisitLValRef(lval);
     } else {
       // TODO(b/293174026): Disallow this.
-      mlir::emitError(GetMlirLocation(*node), "lvalue expected");
+      mlir::emitError(GetJsirTriviaAttr(builder_.getContext(), *node),
+                      "lvalue expected");
       return VisitExpression(node->expression());
     }
   }();
@@ -551,7 +550,7 @@ JsirClassPropertyOp AstToJsir::VisitClassProperty(const JsClassProperty *node) {
 
 JsirImportSpecifierAttr AstToJsir::VisitImportSpecifierAttr(
     const JsImportSpecifier *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   mlir::Attribute mlir_imported;
   if (std::holds_alternative<const JsIdentifier *>(node->imported())) {
     auto *imported = std::get<const JsIdentifier *>(node->imported());
@@ -570,7 +569,7 @@ JsirImportSpecifierAttr AstToJsir::VisitImportSpecifierAttr(
 
 JsirImportDefaultSpecifierAttr AstToJsir::VisitImportDefaultSpecifierAttr(
     const JsImportDefaultSpecifier *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   JsirIdentifierAttr mlir_local = VisitIdentifierAttr(node->local());
   return JsirImportDefaultSpecifierAttr::get(builder_.getContext(), loc,
                                              mlir_local);
@@ -578,7 +577,7 @@ JsirImportDefaultSpecifierAttr AstToJsir::VisitImportDefaultSpecifierAttr(
 
 JsirImportNamespaceSpecifierAttr AstToJsir::VisitImportNamespaceSpecifierAttr(
     const JsImportNamespaceSpecifier *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   JsirIdentifierAttr mlir_local = VisitIdentifierAttr(node->local());
   return JsirImportNamespaceSpecifierAttr::get(builder_.getContext(), loc,
                                                mlir_local);
@@ -594,7 +593,7 @@ JsirImportAttributeAttr AstToJsir::VisitImportAttributeAttr(
 
 JsirExportSpecifierAttr AstToJsir::VisitExportSpecifierAttr(
     const JsExportSpecifier *node) {
-  auto loc = GetMlirLocation(*node);
+  auto loc = GetJsirTriviaAttr(builder_.getContext(), *node);
   mlir::Attribute mlir_exported;
   if (std::holds_alternative<const JsIdentifier *>(node->exported())) {
     auto *exported = std::get<const JsIdentifier *>(node->exported());
@@ -648,71 +647,6 @@ JsirExportDefaultDeclarationOp AstToJsir::VisitExportDefaultDeclaration(
     }
   });
   return op;
-}
-
-JsirLocationAttr AstToJsir::GetJsirLocationAttr(
-    const JsSourceLocation *loc, std::optional<int64_t> start_index,
-    std::optional<int64_t> end_index, std::optional<int64_t> scope_uid) {
-  mlir::MLIRContext *context = builder_.getContext();
-  const JsPosition *start = loc->start();
-  const JsPosition *end = loc->end();
-  JsirPositionAttr jsir_start =
-      JsirPositionAttr::get(context, start->line(), start->column());
-  JsirPositionAttr jsir_end =
-      JsirPositionAttr::get(context, end->line(), end->column());
-  const auto identifier_name = loc->identifier_name();
-  mlir::StringAttr jsir_identifier_name = nullptr;
-  if (identifier_name.has_value()) {
-    jsir_identifier_name = builder_.getStringAttr(identifier_name.value());
-  }
-
-  return JsirLocationAttr::get(context, jsir_start, jsir_end,
-                               jsir_identifier_name, start_index, end_index,
-                               scope_uid);
-}
-
-std::vector<JsirCommentAttr> AstToJsir::GetMlirCommentsFromJsComments(
-    std::optional<const std::vector<std::unique_ptr<JsComment>> *> js_comments,
-    std::optional<int64_t> scope_uid) {
-  mlir::MLIRContext *context = builder_.getContext();
-  std::vector<JsirCommentAttr> mlir_comments;
-  if (js_comments.has_value()) {
-    const auto *comments = js_comments.value();
-    for (const auto &comment : *comments) {
-      const auto *loc = comment->loc();
-      JsirLocationAttr jsir_loc =
-          GetJsirLocationAttr(loc, comment->start(), comment->end(), scope_uid);
-      absl::string_view type =
-          comment->comment_type() == JsCommentType::kCommentLine
-              ? "CommentLine"
-              : "CommentBlock";
-      mlir_comments.push_back(JsirCommentAttr::get(
-          context, jsir_loc, builder_.getStringAttr(comment->value()),
-          builder_.getStringAttr(type)));
-    }
-  }
-
-  return mlir_comments;
-}
-
-JsirCommentsAndLocationAttr AstToJsir::GetMlirLocation(const JsNode &node) {
-  mlir::MLIRContext *context = builder_.getContext();
-
-  JsirLocationAttr jsir_location = nullptr;
-  if (node.loc().has_value()) {
-    jsir_location = GetJsirLocationAttr(node.loc().value(), node.start(),
-                                        node.end(), node.scope_uid());
-  }
-  std::vector<JsirCommentAttr> mlir_leading_comments =
-      GetMlirCommentsFromJsComments(node.leading_comments(), node.scope_uid());
-  std::vector<JsirCommentAttr> mlir_trailing_comments =
-      GetMlirCommentsFromJsComments(node.trailing_comments(), node.scope_uid());
-  std::vector<JsirCommentAttr> mlir_inner_comments =
-      GetMlirCommentsFromJsComments(node.inner_comments(), node.scope_uid());
-
-  return JsirCommentsAndLocationAttr::get(
-      context, jsir_location, mlir_leading_comments, mlir_trailing_comments,
-      mlir_inner_comments);
 }
 
 void AstToJsir::AppendNewBlockAndPopulate(mlir::Region &region,

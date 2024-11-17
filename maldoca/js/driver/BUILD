@@ -71,6 +71,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
+        "@nlohmann_json//:json",
         "@protobuf//:duration_cc_proto",
     ],
 )

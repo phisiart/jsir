@@ -18,6 +18,7 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -35,6 +36,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "nlohmann/json.hpp"
 #include "maldoca/base/ret_check.h"
 #include "maldoca/base/status_macros.h"
 #include "maldoca/js/ast/ast.generated.h"
@@ -150,7 +152,9 @@ struct JsAstRepr : JsRepr {
   std::string Dump() const override {
     std::stringstream ss;
     ast->Serialize(ss);
-    return ss.str();
+    auto json = nlohmann::ordered_json::parse(ss.str(), /*cb=*/nullptr,
+                                              /* allow_exceptions=*/false);
+    return json.dump(2);
   }
 };
 
