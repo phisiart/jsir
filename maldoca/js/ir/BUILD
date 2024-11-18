@@ -408,3 +408,13 @@ cc_binary(
         "@abseil-cpp//absl/strings",
     ],
 )
+
+filegroup(
+    name = "lit_test_files",
+    testonly = True,
+    data = [
+        "//maldoca/js/ir:jsir_gen",
+        "//maldoca/js/ir:lit.cfg.py",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

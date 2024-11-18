@@ -55,6 +55,9 @@ def lit_test(name = None, src = None, size = "small", tags = None, data = None):
         args = ["-v", paths.join(native.package_name(), src)],
         data = data,
         srcs = ["@llvm-project//llvm:lit"],
+        deps = [
+            "@llvm-project//llvm:lit",
+        ],
         main = "lit.py",
         tags = tags,
     )
