@@ -20,16 +20,20 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "absl/log/check.h"
 #include "maldoca/js/ir/analyses/dataflow_analysis.h"
+#include "maldoca/js/ir/analyses/scope.h"
 #include "maldoca/js/ir/ir.h"
 
 namespace maldoca {
@@ -86,6 +90,9 @@ void JsirConstantPropagationAnalysis::VisitOpCommon(
   llvm::TypeSwitch<mlir::Operation *, void>(op)
       .Case([&](JsirAssignmentExpressionOp op) {
         VisitAssignmentExpression(op, operands, before, results, after);
+      })
+      .Case([&](JsirUpdateExpressionOp op) {
+        VisitUpdateExpression(op, operands, before, results, after);
       })
       .Case([&](JsirIdentifierOp op) {
         assert(results.size() == 1);
@@ -198,6 +205,55 @@ void JsirConstantPropagationAnalysis::VisitAssignmentExpression(
 
   const JsirConstantPropagationValue &right = *operands.getRight();
   WriteDenseAfterState(op, left.getName(), right, before, after);
+}
+
+void JsirConstantPropagationAnalysis::VisitUpdateExpression(
+    JsirUpdateExpressionOp op, OperandStates<JsirUpdateExpressionOp> operands,
+    const JsirConstantPropagationState *before,
+    llvm::MutableArrayRef<JsirStateRef<JsirConstantPropagationValue>> results,
+    JsirStateRef<JsirConstantPropagationState> after) {
+  auto id =
+      llvm::dyn_cast<JsirIdentifierRefOp>(op.getArgument().getDefiningOp());
+  if (id == nullptr) {
+    return after.Join(*before);
+  }
+
+  JsirSymbolId symbol_id = GetSymbolId(scopes_, op, id.getName());
+  const auto &value_before = before->Get(symbol_id);
+  if (value_before.IsUninitialized() || value_before.IsUnknown()) {
+    results[0].Join(value_before);
+    return after.Join(*before);
+  }
+
+  mlir::MLIRContext *context = op.getContext();
+  mlir::OpBuilder builder(context);
+
+  auto one = JsirNumericLiteralAttr::get(context, /*loc=*/nullptr,
+                                         builder.getF64FloatAttr(1.0),
+                                         /*extra=*/nullptr);
+  std::optional<mlir::Attribute> value_after;
+  if (op.getOperator_() == "++") {
+    value_after = EmulateBinOp("+", context, **value_before, one);
+  } else if (op.getOperator_() == "--") {
+    value_after = EmulateBinOp("-", context, **value_before, one);
+  }
+
+  if (!value_after.has_value()) {
+    results[0].Join(JsirConstantPropagationValue::Unknown());
+    return after.Join(*before);
+  }
+
+  if (op.getPrefix()) {
+    // ++a
+    results[0].Join(JsirConstantPropagationValue{*value_after});
+  } else {
+    // a++
+    results[0].Join(value_before);
+  }
+
+  return WriteDenseAfterState(op, id.getName(),
+                              JsirConstantPropagationValue{*value_after},
+                              before, after);
 }
 
 std::optional<std::vector<mlir::Block *>>

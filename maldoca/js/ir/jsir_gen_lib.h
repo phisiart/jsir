@@ -17,12 +17,14 @@
 #ifndef MALDOCA_JS_IR_JSIR_GEN_LIB_H_
 #define MALDOCA_JS_IR_JSIR_GEN_LIB_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "maldoca/js/babel/babel.h"
+#include "maldoca/js/driver/driver.h"
 #include "maldoca/js/driver/driver.pb.h"
 
 namespace maldoca {
@@ -43,14 +45,23 @@ enum class JsirPassKind {
   kNormalizeObjectProperties,
   kPeelParentheses,
   kSplitSequenceExpressions,
+  kSplitDeclarationStatements,
   kEraseComments,
+  kRemoveDirectives,
 };
 
 // Analyzes and transforms the provided source code. It first translates the
 // JavaScript source code to JSIR, performs transformations on it (determined by
 // `passes`), runs the provided analysis on it, and returns the result as a
 // Status or string.
-absl::StatusOr<std::string> JsirGen(
+struct JsirGenOutput {
+  std::string repr;
+  JsAnalysisOutputs analysis_outputs;
+};
+
+std::string DumpJsAnalysisOutput(const JsAnalysisOutput &output);
+
+absl::StatusOr<JsirGenOutput> JsirGen(
     Babel& babel, absl::string_view source,
     const std::vector<JsirPassKind>& passes, JsirAnalysisConfig analysis_config,
     const std::vector<JsirTransformConfig>& transform_configs);
@@ -61,7 +72,7 @@ absl::StatusOr<std::string> JsirGen(
 // Status or string. JsirGen uses a sandboxed babel under the hood. It creates
 // the sandboxed babel based off the binary's runfiles directory. The babel
 // runfiles for JsirGenHermetic are packaged into the library.
-absl::StatusOr<std::string> JsirGenHermetic(
+absl::StatusOr<JsirGenOutput> JsirGenHermetic(
     absl::string_view source, const std::vector<JsirPassKind>& passes,
     JsirAnalysisConfig analysis_config,
     const std::vector<JsirTransformConfig>& transform_configs);

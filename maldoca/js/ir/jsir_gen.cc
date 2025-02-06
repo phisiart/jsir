@@ -63,9 +63,13 @@ static auto *kStringToPassKind =
         {"peelparens", maldoca::JsirPassKind::kPeelParentheses},
         {"split_sequence_expressions",
          maldoca::JsirPassKind::kSplitSequenceExpressions},
+        {"remove_directives", maldoca::JsirPassKind::kRemoveDirectives},
+        {"split_declaration_statements",
+         maldoca::JsirPassKind::kSplitDeclarationStatements},
     };
 
 ABSL_FLAG(std::string, input_file, "", "The JavaScript file.");
+ABSL_FLAG(std::string, output_file, "", "The output file.");
 ABSL_FLAG(std::string, jsir_analysis, {}, "The JSIR analysis to run.");
 ABSL_FLAG(std::vector<std::string>, passes, {},
           absl::StrCat(
@@ -131,7 +135,16 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  std::cout << *output << std::endl;
+  std::string output_file = absl::GetFlag(FLAGS_output_file);
+  if (!output_file.empty()) {
+    CHECK_OK(maldoca::SetFileContents(output_file, output->repr));
+  } else {
+    std::cout << output->repr << std::endl;
+  }
+
+  for (const auto &analysis_output : output->analysis_outputs.outputs()) {
+    std::cout << DumpJsAnalysisOutput(analysis_output) << std::endl;
+  }
 
   return 0;
 }

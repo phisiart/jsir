@@ -172,13 +172,24 @@ absl::StatusOr<BabelParseResult> QuickJsBabel::Parse(
 absl::StatusOr<BabelGenerateResult> QuickJsBabel::Generate(
     const BabelAstString& ast_string, const BabelGenerateOptions& opts,
     absl::Duration timeout) {
+  nlohmann::json options_json = BabelGenerateOptionsToJson(
+      opts, ast_string.string_literals_base64_encoded());
+
+  std::string options_string = options_json.dump(/*indent=*/2);
+
+  QjsValue qjs_options_string = QjsValue{
+      qjs_context_.get(),
+      JS_NewStringLen(qjs_context_.get(), options_string.data(),
+                      options_string.size()),
+  };
+
   QjsValue qjs_ast_string = QjsValue{
       qjs_context_.get(),
       JS_NewStringLen(qjs_context_.get(), ast_string.value().data(),
                       ast_string.value().size()),
   };
 
-  std::vector<JSValue> args = {qjs_ast_string.get()};
+  std::vector<JSValue> args = {qjs_ast_string.get(), qjs_options_string.get()};
   QjsValue result{
       qjs_context_.get(),
       JS_Call(qjs_context_.get(), generate_.get(),

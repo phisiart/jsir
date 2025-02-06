@@ -23,11 +23,13 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
+#include "absl/base/nullability.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "maldoca/base/ret_check.h"
 #include "maldoca/base/status_macros.h"
+#include "maldoca/js/babel/babel.h"
 #include "maldoca/js/babel/babel.pb.h"
 #include "maldoca/js/ir/analyses/constant_propagation/analysis.h"
 #include "maldoca/js/ir/analyses/dataflow_analysis.h"
@@ -56,8 +58,8 @@ static absl::StatusOr<JsirAnalysisResult::DataFlow> RunJsirDataFlowAnalysis(
 }
 
 absl::StatusOr<JsirAnalysisResult> RunJsirAnalysis(
-    JsirFileOp op, const BabelScopes &scopes,
-    const JsirAnalysisConfig &config) {
+    JsirFileOp op, const BabelScopes &scopes, const JsirAnalysisConfig &config,
+    absl::Nullable<Babel *> babel) {
   switch (config.kind_case()) {
     case JsirAnalysisConfig::KIND_NOT_SET: {
       return absl::InvalidArgumentError("JsAnalysisConfig kind not set");

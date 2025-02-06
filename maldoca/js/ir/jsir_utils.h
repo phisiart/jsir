@@ -25,6 +25,7 @@
 #include "absl/status/statusor.h"
 #include "maldoca/base/status_macros.h"
 #include "maldoca/js/ir/cast.h"
+#include "maldoca/js/ir/ir.h"
 
 namespace maldoca {
 
@@ -48,6 +49,9 @@ absl::StatusOr<OpT> GetExprRegionOp(mlir::Region &region);
 
 // Extracts Block from a region.
 absl::StatusOr<mlir::Block *> GetStmtsRegionBlock(mlir::Region &region);
+
+// Extracts the last operation from a region of expressions.
+absl::StatusOr<JsirExprsRegionEndOp> GetExprsRegionEndOp(mlir::Region &region);
 
 // Extracts ValueRange from a region.
 absl::StatusOr<mlir::ValueRange> GetExprsRegionValues(mlir::Region &region);
@@ -78,6 +82,21 @@ auto FilterBlockOps(mlir::Block &block) {
     return llvm::cast<OpT>(op);
   });
 }
+
+// ============================================================================
+//  Block-manipulation functions
+// ============================================================================
+
+// Infers if this block should contain a single statement.
+bool IsStatementBlock(mlir::Block &block);
+
+// TODO(tzx) Implement a standalone pass to add `jshir.block_statement`.
+//
+// We shouldn't require each individual pass to maintain the invariant that
+// certain `mlir::Block`s should only contain a single statement - a
+// `mlir::Block` should always allow multiple statements, and we should
+// automatically add `jshir.block_statement`s when lifting JSHIR to AST.
+void WrapBlockContentWithBlockStatement(mlir::Block &block);
 
 }  // namespace maldoca
 

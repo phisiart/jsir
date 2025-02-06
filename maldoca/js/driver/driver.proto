@@ -171,6 +171,8 @@ message JsirTransformConfig {
     NormalizeObjectProperties normalize_object_properties = 4;
     PeelParentheses peel_parentheses = 5;
     SplitSequenceExpressions split_sequence_expressions = 6;
+    SplitDeclarationStatements split_declaration_statements = 8;
+    RemoveDirectives remove_directives = 7;
   }
 
   message ConstantPropagation {}
@@ -182,4 +184,8 @@ message JsirTransformConfig {
   message PeelParentheses {}
 
   message SplitSequenceExpressions {}
+
+  message RemoveDirectives {}
+
+  message SplitDeclarationStatements {}
 }

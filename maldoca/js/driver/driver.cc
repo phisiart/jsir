@@ -109,7 +109,7 @@ absl::StatusOr<std::unique_ptr<JsPass>> JsPass::Create(
 
     case JsPassConfig::kJsirAnalysis: {
       const JsirAnalysisConfig &jsir_analysis = config.jsir_analysis();
-      return std::make_unique<JsirAnalysis>(jsir_analysis);
+      return std::make_unique<JsirAnalysis>(jsir_analysis, babel);
     }
 
     case JsPassConfig::kAstTransform: {
@@ -119,7 +119,7 @@ absl::StatusOr<std::unique_ptr<JsPass>> JsPass::Create(
 
     case JsPassConfig::kJsirTransform: {
       const JsirTransformConfig &transform = config.jsir_transform();
-      return std::make_unique<JsirTransform>(transform);
+      return std::make_unique<JsirTransform>(transform, babel);
     }
   }
 }

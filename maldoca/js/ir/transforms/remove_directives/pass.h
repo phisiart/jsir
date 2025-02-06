@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MALDOCA_JS_IR_ANALYSES_ANALYSIS_H_
-#define MALDOCA_JS_IR_ANALYSES_ANALYSIS_H_
+#ifndef MALDOCA_JS_IR_REMOVE_DIRECTIVES_PASS_H_
+#define MALDOCA_JS_IR_REMOVE_DIRECTIVES_PASS_H_
 
-#include "absl/base/nullability.h"
-#include "absl/status/statusor.h"
-#include "maldoca/js/babel/babel.h"
-#include "maldoca/js/babel/babel.pb.h"
-#include "maldoca/js/driver/driver.pb.h"
-#include "maldoca/js/ir/ir.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/Pass/Pass.h"
 
 namespace maldoca {
 
-absl::StatusOr<JsirAnalysisResult> RunJsirAnalysis(
-    JsirFileOp op, const BabelScopes &scopes, const JsirAnalysisConfig &config,
-    absl::Nullable<Babel *> babel);
+void RemoveDirectives(mlir::Operation *root);
+
+struct RemoveDirectivesPass
+    : public mlir::PassWrapper<RemoveDirectivesPass, mlir::OperationPass<>> {
+  void runOnOperation() override {
+    mlir::Operation *root = getOperation();
+    RemoveDirectives(root);
+  }
+};
 
 }  // namespace maldoca
 
-#endif  // MALDOCA_JS_IR_ANALYSES_ANALYSIS_H_
+#endif  // MALDOCA_JS_IR_REMOVE_DIRECTIVES_PASS_H_

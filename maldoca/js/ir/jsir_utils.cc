@@ -14,14 +14,20 @@
 
 #include "maldoca/js/ir/jsir_utils.h"
 
+#include <cassert>
+
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "maldoca/base/status_macros.h"
 #include "maldoca/js/ir/ir.h"
 
 namespace maldoca {
@@ -61,7 +67,7 @@ absl::StatusOr<mlir::Value> GetExprRegionValue(mlir::Region &region) {
   return expr_region_end.getArgument();
 }
 
-absl::StatusOr<mlir::ValueRange> GetExprsRegionValues(mlir::Region &region) {
+absl::StatusOr<JsirExprsRegionEndOp> GetExprsRegionEndOp(mlir::Region &region) {
   if (!region.hasOneBlock()) {
     return absl::InvalidArgumentError("Region should have exactly one block.");
   }
@@ -74,7 +80,140 @@ absl::StatusOr<mlir::ValueRange> GetExprsRegionValues(mlir::Region &region) {
     return absl::InvalidArgumentError(
         "Block should end with JsirExprsRegionEndOp.");
   }
+  return exprs_region_end;
+}
+
+absl::StatusOr<mlir::ValueRange> GetExprsRegionValues(mlir::Region &region) {
+  MALDOCA_ASSIGN_OR_RETURN(JsirExprsRegionEndOp exprs_region_end,
+                           GetExprsRegionEndOp(region));
   return exprs_region_end.getArguments();
+}
+
+// ============================================================================
+//  Block-manipulation functions
+// ============================================================================
+
+bool IsStatementBlock(mlir::Block &block) {
+  mlir::Region *region = block.getParent();
+  if (region == nullptr) {
+    return false;
+  }
+
+  return llvm::TypeSwitch<mlir::Operation *, bool>(region->getParentOp())
+      .Case([&](JshirWithStatementOp parent_op) {
+        // interface WithStatement <: Statement {
+        //   object: Expression;
+        //   body: Statement;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Case([&](JshirLabeledStatementOp parent_op) {
+        // interface LabeledStatement <: Statement {
+        //   label: Identifier;
+        //   body: Statement;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Case([&](JshirIfStatementOp parent_op) {
+        // interface IfStatement <: Statement {
+        //   test: Expression;
+        //   consequent: Statement;
+        //   alternate: Statement | null;
+        // }
+        return region == &parent_op.getConsequent() ||
+               region == &parent_op.getAlternate();
+      })
+      .Case([&](JshirWhileStatementOp parent_op) {
+        // interface WhileStatement <: Statement {
+        //   test: Expression;
+        //   body: Statement;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Case([&](JshirDoWhileStatementOp parent_op) {
+        // interface DoWhileStatement <: Statement {
+        //   body: Statement;
+        //   test: Expression;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Case([&](JshirForStatementOp parent_op) {
+        // interface ForStatement <: Statement {
+        //   init: VariableDeclaration | Expression | null;
+        //   test: Expression | null;
+        //   update: Expression | null;
+        //   body: Statement;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Case([&](JshirForInStatementOp parent_op) {
+        // interface ForInStatement <: Statement {
+        //   left: VariableDeclaration | LVal;
+        //   right: Expression;
+        //   body: Statement;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Case([&](JshirForOfStatementOp parent_op) {
+        // interface ForOfStatement <: Statement {
+        //   left: VariableDeclaration | LVal;
+        //   right: Expression;
+        //   body: Statement;
+        //   await: boolean;
+        // }
+        return region == &parent_op.getBody();
+      })
+      .Default(false);
+}
+
+void WrapBlockContentWithBlockStatement(mlir::Block &block) {
+  mlir::Region *region = block.getParent();
+  mlir::MLIRContext *context = region->getContext();
+
+  // +-------------+-------------+
+  // | Before      | After       |
+  // +-------------+-------------+
+  // | ^block:     | ^block:     |
+  // |   op1       |             |
+  // |   op2       | ^new_block: |
+  // |   ...       |   op1       |
+  // |             |   op2       |
+  // |             |   ...       |
+  // +-------------+-------------+
+  mlir::Block *new_block = block.splitBlock(block.begin());
+  assert(block.empty());
+
+  // After:
+  //
+  //  ^block:
+  //    JshirBlockStatement(/*directives=*/{}, /*body=*/{})
+  //
+  //  ^new_block:
+  //    op1
+  //    op2
+  //    ...
+  mlir::OpBuilder builder{context};
+  builder.setInsertionPointToStart(&block);
+  auto block_stmt_op = builder.create<JshirBlockStatementOp>(region->getLoc());
+
+  // `directives` is empty, but we need to keep an empty block in the region.
+  block_stmt_op.getDirectives().emplaceBlock();
+
+  // After:
+  //
+  //  ^block:
+  //    JshirBlockStatement(
+  //      /*directives=*/{
+  //      ^empty_block:
+  //      },
+  //      /*body=*/{
+  //      ^new_block:
+  //        op1
+  //        op2
+  //        ...
+  //      })
+  new_block->moveBefore(&block_stmt_op.getBody(),
+                        block_stmt_op.getBody().end());
 }
 
 }  // namespace maldoca

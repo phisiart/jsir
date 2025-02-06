@@ -22,21 +22,13 @@ package(
 )
 
 cc_library(
-    name = "analysis",
-    srcs = ["analysis.cc"],
-    hdrs = ["analysis.h"],
+    name = "pass",
+    srcs = ["pass.cc"],
+    hdrs = ["pass.h"],
     deps = [
-        "//maldoca/js/babel:babel_cc_proto",
         "//maldoca/js/ir",
-        "//maldoca/js/ir/analyses:conditional_forward_per_var_dataflow_analysis",
-        "//maldoca/js/ir/analyses:dataflow_analysis",
-        "//maldoca/js/ir/analyses:per_var_state",
-        "//maldoca/js/ir/analyses:scope",
-        "@abseil-cpp//absl/log:check",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Analysis",
-        "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Pass",
     ],
 )

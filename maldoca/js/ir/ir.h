@@ -318,6 +318,12 @@ std::optional<mlir::Attribute> QuickJsValueToMlirAttribute(
     JSContext *qjs_context, mlir::MLIRContext *context, JSValue val);
 
 // Emulates a binary operation in QuickJS.
+std::optional<mlir::Attribute> EmulateBinOp(std::string op,
+                                            mlir::MLIRContext *context,
+                                            mlir::Attribute mlir_left,
+                                            mlir::Attribute mlir_right);
+
+// Emulates a binary operation in QuickJS.
 QjsValue EmulateBinOp(JSContext *qjs_context, std::string op, QjsValue left,
                       QjsValue right);
 

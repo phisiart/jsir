@@ -70,6 +70,46 @@ class ParseTextProtoFileErrorCollector : public google::protobuf::io::ErrorColle
   const google::protobuf::Message& proto_;
 };
 
+enum class SetOrAppend { kSet, kAppend };
+
+absl::Status SetFileContentsOrAppend(const std::filesystem::path& file_name,
+                                     std::string_view content,
+                                     SetOrAppend set_or_append) {
+  // Use POSIX C APIs instead of C++ iostreams to avoid exceptions.
+  int fd = open(file_name.c_str(),
+                O_WRONLY | O_CREAT | O_CLOEXEC |
+                    (set_or_append == SetOrAppend::kAppend ? O_APPEND : 0),
+                0664);
+  if (fd == -1) {
+    return ErrNoToStatusWithFilename(errno, file_name);
+  }
+
+  // Clear existing contents if not appending.
+  if (set_or_append == SetOrAppend::kSet) {
+    if (ftruncate(fd, 0) == -1) {
+      return ErrNoToStatusWithFilename(errno, file_name);
+    }
+  }
+
+  ssize_t written = 0;
+  while (written < content.size()) {
+    ssize_t n = write(fd, content.data() + written, content.size() - written);
+    if (n < 0) {
+      if (errno == EAGAIN) {
+        continue;
+      }
+      close(fd);
+      return ErrNoToStatusWithFilename(errno, file_name);
+    }
+    written += n;
+  }
+
+  if (close(fd) != 0) {
+    return ErrNoToStatusWithFilename(errno, file_name);
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 absl::StatusOr<std::string> GetFileContents(
@@ -128,6 +168,11 @@ absl::Status ParseTextProtoFile(const std::filesystem::path& file_name,
                                 google::protobuf::Message* proto) {
   MALDOCA_ASSIGN_OR_RETURN(std::string text_proto, GetFileContents(file_name));
   return ParseTextProto(text_proto, file_name, proto);
+}
+
+absl::Status SetFileContents(const std::filesystem::path& file_name,
+                             std::string_view content) {
+  return SetFileContentsOrAppend(file_name, content, SetOrAppend::kSet);
 }
 
 }  // namespace maldoca

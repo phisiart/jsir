@@ -52,6 +52,8 @@ std::string DumpJsirAnalysisResult(const JsirAnalysisResult &result) {
   }
 }
 
+}  // namespace
+
 std::string DumpJsAnalysisOutput(const JsAnalysisOutput &output) {
   switch (output.kind_case()) {
     case JsAnalysisOutput::KIND_NOT_SET:
@@ -63,9 +65,7 @@ std::string DumpJsAnalysisOutput(const JsAnalysisOutput &output) {
   }
 }
 
-}  // namespace
-
-absl::StatusOr<std::string> JsirGen(
+absl::StatusOr<JsirGenOutput> JsirGen(
     Babel &babel, absl::string_view source,
     const std::vector<JsirPassKind> &passes, JsirAnalysisConfig analysis_config,
     const std::vector<JsirTransformConfig> &transform_configs) {
@@ -238,6 +238,26 @@ absl::StatusOr<std::string> JsirGen(
 
         break;
       }
+
+      case JsirPassKind::kSplitDeclarationStatements: {
+        JsirTransformConfig transform;
+        *transform.mutable_split_declaration_statements() = {};
+
+        *pass_configs.add_passes()->mutable_jsir_transform() =
+            std::move(transform);
+
+        break;
+      }
+
+      case JsirPassKind::kRemoveDirectives: {
+        JsirTransformConfig transform;
+        *transform.mutable_remove_directives() = {};
+
+        *pass_configs.add_passes()->mutable_jsir_transform() =
+            std::move(transform);
+
+        break;
+      }
     }
   }
 
@@ -253,17 +273,13 @@ absl::StatusOr<std::string> JsirGen(
   MALDOCA_RET_CHECK_OK(
       RunPasses(pass_configs, pass_context, &babel, &mlir_context));
 
-  std::string output;
-  absl::StrAppend(&output, pass_context.repr->Dump());
-  for (const auto &analysis_output : pass_context.outputs.outputs()) {
-    absl::StrAppend(&output, "\n");
-    absl::StrAppend(&output, DumpJsAnalysisOutput(analysis_output));
-  }
-
-  return output;
+  return JsirGenOutput{
+      .repr = pass_context.repr->Dump(),
+      .analysis_outputs = std::move(pass_context.outputs),
+  };
 }
 
-absl::StatusOr<std::string> JsirGenHermetic(
+absl::StatusOr<JsirGenOutput> JsirGenHermetic(
     absl::string_view source, const std::vector<JsirPassKind> &passes,
     JsirAnalysisConfig analysis_config,
     const std::vector<JsirTransformConfig> &transform_configs) {

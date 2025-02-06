@@ -274,8 +274,9 @@ class JsAnalysisTmpl : public JsAnalysis {
 
 class JsirAnalysis : public JsAnalysisTmpl<JsirRepr> {
  public:
-  explicit JsirAnalysis(JsirAnalysisConfig config)
-      : config_(std::move(config)) {}
+  explicit JsirAnalysis(JsirAnalysisConfig config,
+                        absl::Nullable<Babel *> babel)
+      : config_(std::move(config)), babel_(babel) {}
 
   std::string name() const override {
     return absl::StrCat("JsirAnalysis ", config_.kind_case());
@@ -284,14 +285,16 @@ class JsirAnalysis : public JsAnalysisTmpl<JsirRepr> {
   absl::Status Analyze(std::optional<absl::string_view> original_source,
                        const JsirRepr &repr,
                        JsAnalysisOutputs &outputs) override {
-    MALDOCA_ASSIGN_OR_RETURN(JsirAnalysisResult result,
-                             RunJsirAnalysis(*repr.op, repr.scopes, config_));
+    MALDOCA_ASSIGN_OR_RETURN(
+        JsirAnalysisResult result,
+        RunJsirAnalysis(*repr.op, repr.scopes, config_, babel_));
     *outputs.add_outputs()->mutable_jsir_analysis() = std::move(result);
     return absl::OkStatus();
   }
 
  private:
   JsirAnalysisConfig config_;
+  absl::Nullable<Babel *> babel_;
 };
 
 // =============================================================================
@@ -355,8 +358,9 @@ class JsAstTransform : public JsTransformTmpl<JsAstRepr> {
 
 class JsirTransform : public JsTransformTmpl<JsirRepr> {
  public:
-  explicit JsirTransform(JsirTransformConfig config)
-      : config_(std::move(config)) {}
+  explicit JsirTransform(JsirTransformConfig config,
+                         absl::Nullable<Babel *> babel)
+      : config_(std::move(config)), babel_(babel) {}
 
   std::string name() const override {
     return absl::StrCat("JsirTransform ", config_.kind_case());
@@ -365,10 +369,11 @@ class JsirTransform : public JsTransformTmpl<JsirRepr> {
  private:
   absl::Status Transform(std::optional<absl::string_view> original_source,
                          JsirRepr &repr, JsAnalysisOutputs &outputs) override {
-    return TransformJsir(outputs, *repr.op, repr.scopes, config_);
+    return TransformJsir(outputs, *repr.op, repr.scopes, config_, babel_);
   }
 
   JsirTransformConfig config_;
+  absl::Nullable<Babel *> babel_;
 };
 
 }  // namespace maldoca

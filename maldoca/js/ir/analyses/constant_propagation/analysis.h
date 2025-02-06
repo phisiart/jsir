@@ -188,6 +188,13 @@ class JsirConstantPropagationAnalysis
       llvm::MutableArrayRef<JsirStateRef<JsirConstantPropagationValue>> results,
       JsirStateRef<JsirConstantPropagationState> after);
 
+  void VisitUpdateExpression(
+      JsirUpdateExpressionOp op,
+      OperandStates<JsirUpdateExpressionOp> operands,
+      const JsirConstantPropagationState *before,
+      llvm::MutableArrayRef<JsirStateRef<JsirConstantPropagationValue>> results,
+      JsirStateRef<JsirConstantPropagationState> after);
+
   std::optional<std::vector<mlir::Block *>> InferExecutableSuccessors(
       mlir::Operation *op,
       llvm::ArrayRef<const JsirConstantPropagationValue *> operands) override;

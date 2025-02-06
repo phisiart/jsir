@@ -19,9 +19,11 @@
 #include <vector>
 
 #include "mlir/Pass/Pass.h"
+#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "maldoca/js/ast/ast.generated.h"
+#include "maldoca/js/babel/babel.h"
 #include "maldoca/js/babel/babel.pb.h"
 #include "maldoca/js/driver/driver.pb.h"
 #include "maldoca/js/ir/ir.h"
@@ -29,25 +31,27 @@
 namespace maldoca {
 
 // Creates the corresponding pass based on the given transform config.
-std::unique_ptr<mlir::Pass> CreateJsirTransformPass(
+absl::StatusOr<std::unique_ptr<mlir::Pass>> CreateJsirTransformPass(
     const JsAnalysisOutputs &analysis_outputs, const BabelScopes *scopes,
-    JsirTransformConfig config);
+    JsirTransformConfig config, absl::Nullable<Babel *> babel);
 
 // Performs a single transform on a JSHIR or JSLIR module.
 absl::Status TransformJsir(const JsAnalysisOutputs &analysis_outputs,
                            JsirFileOp jsir_file, const BabelScopes &scopes,
-                           JsirTransformConfig config);
+                           JsirTransformConfig config,
+                           absl::Nullable<Babel *> babel);
 
 // Performs the given list of transforms on a JSHIR or JSLIR module.
 absl::Status TransformJsir(const JsAnalysisOutputs &analysis_outputs,
                            JsirFileOp jsir_file, const BabelScopes &scopes,
-                           std::vector<JsirTransformConfig> configs);
+                           std::vector<JsirTransformConfig> configs,
+                           absl::Nullable<Babel *> babel);
 
 // Converts the AST into JSHIR, performs the given list of transforms, and
 // converts back to an AST.
 absl::StatusOr<std::unique_ptr<JsFile>> TransformJsAst(
     const JsFile &ast, const BabelScopes &scopes,
-    std::vector<JsirTransformConfig> configs);
+    std::vector<JsirTransformConfig> configs, absl::Nullable<Babel *> babel);
 
 }  // namespace maldoca
 

@@ -158,7 +158,10 @@ message BabelAstString {
 message BabelGenerateOptions {
   // Whether comments are kept in the generated source.
   optional bool include_comments = 1 [default = true];
-};
+
+  // Whether to minify the generated source.
+  optional bool compact = 2 [default = false];
+}
 
 message PositionPb {
   optional int64 line = 1;
@@ -207,5 +210,5 @@ message BabelScope {
 }
 
 message BabelScopes {
-  map<int64, BabelScope> scopes = 1;
+  map<int32, BabelScope> scopes = 1;
 }

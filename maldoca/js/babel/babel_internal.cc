@@ -69,4 +69,15 @@ nlohmann::json BabelParseOptionsToJson(const BabelParseRequest &request) {
   return options;
 }
 
+nlohmann::json BabelGenerateOptionsToJson(const BabelGenerateOptions &options,
+                                          bool string_literals_base64_encoded) {
+  nlohmann::json json{
+      {"comments", options.include_comments()},
+      {"compact", options.compact()},
+      {"base64DecodeStringLiterals", string_literals_base64_encoded},
+  };
+
+  return json;
+}
+
 }  // namespace maldoca

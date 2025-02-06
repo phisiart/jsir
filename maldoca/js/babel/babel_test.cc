@@ -40,6 +40,11 @@ static constexpr char kSource[] = R"(console.log("Hello, Babel!");)";
 
 static constexpr char kVarDef[] = R"(var a = 1;)";
 
+static constexpr char kVarDefCompact[] = R"(var a=1;)";
+
+static constexpr char kCodeWithComment[] = R"(// This is a comment.
+console.log("Hello, Babel!");)";
+
 TEST_P(BabelTest, ParseSimpleCode) {
   std::unique_ptr<Babel> babel = GetParam().babel_factory();
   BabelParseRequest request;
@@ -152,6 +157,74 @@ TEST_P(BabelTest, GenerateSimpleCode) {
 
   EXPECT_EQ(generate_result.source_code, kSource);
   EXPECT_EQ(generate_result.error, std::nullopt);
+}
+
+TEST_P(BabelTest, GenerateComments) {
+  std::unique_ptr<Babel> babel = GetParam().babel_factory();
+  BabelParseRequest request;
+  MALDOCA_ASSERT_OK_AND_ASSIGN(
+      BabelParseResult parse_result,
+      babel->Parse(kCodeWithComment, request, absl::InfiniteDuration()));
+
+  {
+    BabelGenerateOptions options;
+    options.set_include_comments(true);
+
+    MALDOCA_ASSERT_OK_AND_ASSIGN(
+        BabelGenerateResult generate_result,
+        babel->Generate(parse_result.ast_string, options,
+                        absl::InfiniteDuration()));
+
+    EXPECT_EQ(generate_result.source_code, kCodeWithComment);
+    EXPECT_EQ(generate_result.error, std::nullopt);
+  }
+
+  {
+    BabelGenerateOptions options;
+    options.set_include_comments(false);
+
+    MALDOCA_ASSERT_OK_AND_ASSIGN(
+        BabelGenerateResult generate_result,
+        babel->Generate(parse_result.ast_string, options,
+                        absl::InfiniteDuration()));
+
+    EXPECT_EQ(generate_result.source_code, kSource);
+    EXPECT_EQ(generate_result.error, std::nullopt);
+  }
+}
+
+TEST_P(BabelTest, GenerateCompact) {
+  std::unique_ptr<Babel> babel = GetParam().babel_factory();
+  BabelParseRequest request;
+  MALDOCA_ASSERT_OK_AND_ASSIGN(
+      BabelParseResult parse_result,
+      babel->Parse(kVarDef, request, absl::InfiniteDuration()));
+
+  {
+    BabelGenerateOptions options;
+    options.set_compact(false);
+
+    MALDOCA_ASSERT_OK_AND_ASSIGN(
+        BabelGenerateResult generate_result,
+        babel->Generate(parse_result.ast_string, options,
+                        absl::InfiniteDuration()));
+
+    EXPECT_EQ(generate_result.source_code, kVarDef);
+    EXPECT_EQ(generate_result.error, std::nullopt);
+  }
+
+  {
+    BabelGenerateOptions options;
+    options.set_compact(true);
+
+    MALDOCA_ASSERT_OK_AND_ASSIGN(
+        BabelGenerateResult generate_result,
+        babel->Generate(parse_result.ast_string, options,
+                        absl::InfiniteDuration()));
+
+    EXPECT_EQ(generate_result.source_code, kVarDefCompact);
+    EXPECT_EQ(generate_result.error, std::nullopt);
+  }
 }
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(BabelTest);

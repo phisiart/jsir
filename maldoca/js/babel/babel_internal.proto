@@ -35,6 +35,9 @@ message BabelGenerateRequest {
 
   // Whether we should base64-decode string literals.
   optional bool base64_decode_string_literals = 2 [default = false];
+
+  // Whether to minify the generated source.
+  optional bool compact = 3 [default = false];
 }
 
 message BabelResponse {
