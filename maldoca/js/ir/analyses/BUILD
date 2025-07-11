@@ -27,9 +27,9 @@ cc_library(
     hdrs = ["analysis.h"],
     deps = [
         ":dataflow_analysis",
-        ":scope",
         "//maldoca/base:ret_check",
         "//maldoca/base:status",
+        "//maldoca/js/ast",
         "//maldoca/js/babel",
         "//maldoca/js/babel:babel_cc_proto",
         "//maldoca/js/driver:driver_cc_proto",
@@ -39,6 +39,7 @@ cc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
@@ -60,7 +61,10 @@ cc_library(
     hdrs = ["dataflow_analysis.h"],
     deps = [
         ":state",
+        "//maldoca/js/ir",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/log:check",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -84,12 +88,25 @@ cc_library(
     name = "per_var_state",
     hdrs = ["per_var_state.h"],
     deps = [
-        ":dataflow_analysis",
         ":scope",
         ":state",
+        "//maldoca/js/ast",
         "@abseil-cpp//absl/algorithm:container",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
+    ],
+)
+
+cc_test(
+    name = "per_var_state_test",
+    srcs = ["per_var_state_test.cc"],
+    deps = [
+        ":dataflow_analysis",
+        ":per_var_state",
+        "//maldoca/js/ast",
+        "//maldoca/js/babel:babel_cc_proto",
+        "@googletest//:gtest_main",
         "@llvm-project//mlir:Analysis",
     ],
 )
@@ -102,6 +119,7 @@ cc_library(
         ":dataflow_analysis",
         ":per_var_state",
         ":scope",
+        "//maldoca/js/ast",
         "//maldoca/js/babel:babel_cc_proto",
         "//maldoca/js/ir",
         "@abseil-cpp//absl/strings:string_view",
@@ -116,14 +134,12 @@ cc_library(
     srcs = ["scope.cc"],
     hdrs = ["scope.h"],
     deps = [
+        "//maldoca/js/ast",
         "//maldoca/js/babel:babel_cc_proto",
+        "//maldoca/js/babel:scope",
         "//maldoca/js/ir",
-        "@abseil-cpp//absl/base:nullability",
-        "@abseil-cpp//absl/container:btree",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/strings:str_format",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Support",
     ],
 )

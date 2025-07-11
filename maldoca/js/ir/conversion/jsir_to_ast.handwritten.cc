@@ -27,6 +27,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
@@ -250,16 +251,16 @@ absl::StatusOr<JsirToAst::ObjectPropertyKey> JsirToAst::GetObjectPropertyKey(
     mlir::Attribute mlir_literal_key_attr = literal_key.value();
     std::unique_ptr<JsExpression> key;
     if (auto mlir_literal_key =
-            mlir_literal_key_attr.dyn_cast<JsirIdentifierAttr>()) {
+            mlir::dyn_cast<JsirIdentifierAttr>(mlir_literal_key_attr)) {
       MALDOCA_ASSIGN_OR_RETURN(key, VisitIdentifierAttr(mlir_literal_key));
-    } else if (auto mlir_literal_key =
-                   mlir_literal_key_attr.dyn_cast<JsirStringLiteralAttr>()) {
+    } else if (auto mlir_literal_key = mlir::dyn_cast<JsirStringLiteralAttr>(
+                   mlir_literal_key_attr)) {
       MALDOCA_ASSIGN_OR_RETURN(key, VisitStringLiteralAttr(mlir_literal_key));
-    } else if (auto mlir_literal_key =
-                   mlir_literal_key_attr.dyn_cast<JsirNumericLiteralAttr>()) {
+    } else if (auto mlir_literal_key = mlir::dyn_cast<JsirNumericLiteralAttr>(
+                   mlir_literal_key_attr)) {
       MALDOCA_ASSIGN_OR_RETURN(key, VisitNumericLiteralAttr(mlir_literal_key));
-    } else if (auto mlir_literal_key =
-                   mlir_literal_key_attr.dyn_cast<JsirBigIntLiteralAttr>()) {
+    } else if (auto mlir_literal_key = mlir::dyn_cast<JsirBigIntLiteralAttr>(
+                   mlir_literal_key_attr)) {
       MALDOCA_ASSIGN_OR_RETURN(key, VisitBigIntLiteralAttr(mlir_literal_key));
     } else {
       return absl::InvalidArgumentError(
@@ -396,11 +397,11 @@ JsirToAst::GetMemberExpressionProperty(
     std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsPrivateName>>
         property;
     if (auto mlir_literal_property =
-            literal_property.value().dyn_cast<JsirIdentifierAttr>()) {
+            mlir::dyn_cast<JsirIdentifierAttr>(literal_property.value())) {
       MALDOCA_ASSIGN_OR_RETURN(property,
                                VisitIdentifierAttr(mlir_literal_property));
-    } else if (auto mlir_literal_property =
-                   literal_property.value().dyn_cast<JsirPrivateNameAttr>()) {
+    } else if (auto mlir_literal_property = mlir::dyn_cast<JsirPrivateNameAttr>(
+                   literal_property.value())) {
       MALDOCA_ASSIGN_OR_RETURN(property,
                                VisitPrivateNameAttr(mlir_literal_property));
     } else {
@@ -595,9 +596,10 @@ absl::StatusOr<std::unique_ptr<JsClassProperty>> JsirToAst::VisitClassProperty(
 absl::StatusOr<std::variant<std::unique_ptr<JsIdentifier>,
                             std::unique_ptr<JsStringLiteral>>>
 JsirToAst::GetIdentifierOrStringLiteral(mlir::Attribute attr) {
-  if (auto identifier = attr.dyn_cast<JsirIdentifierAttr>()) {
+  if (auto identifier = mlir::dyn_cast<JsirIdentifierAttr>(attr)) {
     return VisitIdentifierAttr(identifier);
-  } else if (auto string_literal = attr.dyn_cast<JsirStringLiteralAttr>()) {
+  } else if (auto string_literal =
+                 mlir::dyn_cast<JsirStringLiteralAttr>(attr)) {
     return VisitStringLiteralAttr(string_literal);
   } else {
     return absl::InvalidArgumentError("Must be Identifier or StringLiteral.");

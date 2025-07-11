@@ -60,6 +60,18 @@ cc_library(
 )
 
 cc_library(
+    name = "scope",
+    srcs = ["scope.cc"],
+    hdrs = ["scope.h"],
+    deps = [
+        ":babel_cc_proto",
+        "//maldoca/js/ast",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+cc_library(
     name = "babel_test",
     testonly = 1,
     srcs = ["babel_test.cc"],
@@ -67,6 +79,7 @@ cc_library(
     deps = [
         ":babel",
         ":babel_cc_proto",
+        ":scope",
         "//maldoca/base/testing:protocol-buffer-matchers",
         "//maldoca/base/testing:status_matchers",
         "@abseil-cpp//absl/strings",

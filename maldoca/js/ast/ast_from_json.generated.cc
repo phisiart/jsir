@@ -302,6 +302,58 @@ JsCommentLine::FromJson(const nlohmann::json& json) {
 }
 
 // =============================================================================
+// JsSymbolId
+// =============================================================================
+
+absl::StatusOr<std::string>
+JsSymbolId::GetName(const nlohmann::json& json) {
+  auto name_it = json.find("name");
+  if (name_it == json.end()) {
+    return absl::InvalidArgumentError("`name` is undefined.");
+  }
+  const nlohmann::json& json_name = name_it.value();
+
+  if (json_name.is_null()) {
+    return absl::InvalidArgumentError("json_name is null.");
+  }
+  if (!json_name.is_string()) {
+    return absl::InvalidArgumentError("Expecting json_name.is_string().");
+  }
+  return json_name.get<std::string>();
+}
+
+absl::StatusOr<std::optional<int64_t>>
+JsSymbolId::GetDefScopeUid(const nlohmann::json& json) {
+  auto def_scope_uid_it = json.find("defScopeUid");
+  if (def_scope_uid_it == json.end()) {
+    return std::nullopt;
+  }
+  const nlohmann::json& json_def_scope_uid = def_scope_uid_it.value();
+
+  if (json_def_scope_uid.is_null()) {
+    return absl::InvalidArgumentError("json_def_scope_uid is null.");
+  }
+  if (!json_def_scope_uid.is_number_integer()) {
+    return absl::InvalidArgumentError("Expecting json_def_scope_uid.is_number_integer().");
+  }
+  return json_def_scope_uid.get<int64_t>();
+}
+
+absl::StatusOr<std::unique_ptr<JsSymbolId>>
+JsSymbolId::FromJson(const nlohmann::json& json) {
+  if (!json.is_object()) {
+    return absl::InvalidArgumentError("JSON is not an object.");
+  }
+
+  MALDOCA_ASSIGN_OR_RETURN(auto name, JsSymbolId::GetName(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto def_scope_uid, JsSymbolId::GetDefScopeUid(json));
+
+  return absl::make_unique<JsSymbolId>(
+      std::move(name),
+      std::move(def_scope_uid));
+}
+
+// =============================================================================
 // JsNode
 // =============================================================================
 
@@ -446,6 +498,46 @@ JsNode::GetScopeUid(const nlohmann::json& json) {
     return absl::InvalidArgumentError("Expecting json_scope_uid.is_number_integer().");
   }
   return json_scope_uid.get<int64_t>();
+}
+
+absl::StatusOr<std::optional<std::unique_ptr<JsSymbolId>>>
+JsNode::GetReferencedSymbol(const nlohmann::json& json) {
+  auto referenced_symbol_it = json.find("referencedSymbol");
+  if (referenced_symbol_it == json.end()) {
+    return std::nullopt;
+  }
+  const nlohmann::json& json_referenced_symbol = referenced_symbol_it.value();
+
+  if (json_referenced_symbol.is_null()) {
+    return absl::InvalidArgumentError("json_referenced_symbol is null.");
+  }
+  return JsSymbolId::FromJson(json_referenced_symbol);
+}
+
+absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsSymbolId>>>>
+JsNode::GetDefinedSymbols(const nlohmann::json& json) {
+  auto defined_symbols_it = json.find("definedSymbols");
+  if (defined_symbols_it == json.end()) {
+    return std::nullopt;
+  }
+  const nlohmann::json& json_defined_symbols = defined_symbols_it.value();
+
+  if (json_defined_symbols.is_null()) {
+    return absl::InvalidArgumentError("json_defined_symbols is null.");
+  }
+  if (!json_defined_symbols.is_array()) {
+    return absl::InvalidArgumentError("json_defined_symbols expected to be array.");
+  }
+
+  std::vector<std::unique_ptr<JsSymbolId>> defined_symbols;
+  for (const nlohmann::json& json_defined_symbols_element : json_defined_symbols) {
+    if (json_defined_symbols_element.is_null()) {
+      return absl::InvalidArgumentError("json_defined_symbols_element is null.");
+    }
+    MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols_element, JsSymbolId::FromJson(json_defined_symbols_element));
+    defined_symbols.push_back(std::move(defined_symbols_element));
+  }
+  return defined_symbols;
 }
 
 absl::StatusOr<std::unique_ptr<JsNode>>
@@ -688,6 +780,8 @@ JsInterpreterDirective::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsInterpreterDirective::GetValue(json));
 
   return absl::make_unique<JsInterpreterDirective>(
@@ -698,6 +792,8 @@ JsInterpreterDirective::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value));
 }
 
@@ -948,6 +1044,8 @@ JsDirectiveLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsDirectiveLiteral::GetValue(json));
   MALDOCA_ASSIGN_OR_RETURN(auto extra, JsDirectiveLiteral::GetExtra(json));
 
@@ -959,6 +1057,8 @@ JsDirectiveLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value),
       std::move(extra));
 }
@@ -994,6 +1094,8 @@ JsDirective::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsDirective::GetValue(json));
 
   return absl::make_unique<JsDirective>(
@@ -1004,6 +1106,8 @@ JsDirective::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value));
 }
 
@@ -1117,6 +1221,8 @@ JsProgram::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto interpreter, JsProgram::GetInterpreter(json));
   MALDOCA_ASSIGN_OR_RETURN(auto source_type, JsProgram::GetSourceType(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsProgram::GetBody(json));
@@ -1130,6 +1236,8 @@ JsProgram::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(interpreter),
       std::move(source_type),
       std::move(body),
@@ -1167,6 +1275,8 @@ JsFile::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto program, JsFile::GetProgram(json));
 
   return absl::make_unique<JsFile>(
@@ -1177,6 +1287,8 @@ JsFile::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(program));
 }
 
@@ -1472,6 +1584,8 @@ JsIdentifier::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto name, JsIdentifier::GetName(json));
 
   return absl::make_unique<JsIdentifier>(
@@ -1482,6 +1596,8 @@ JsIdentifier::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(name));
 }
 
@@ -1532,6 +1648,8 @@ JsPrivateName::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsPrivateName::GetId(json));
 
   return absl::make_unique<JsPrivateName>(
@@ -1542,6 +1660,8 @@ JsPrivateName::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id));
 }
 
@@ -1671,6 +1791,8 @@ JsRegExpLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto pattern, JsRegExpLiteral::GetPattern(json));
   MALDOCA_ASSIGN_OR_RETURN(auto flags, JsRegExpLiteral::GetFlags(json));
   MALDOCA_ASSIGN_OR_RETURN(auto extra, JsRegExpLiteral::GetExtra(json));
@@ -1683,6 +1805,8 @@ JsRegExpLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(pattern),
       std::move(flags),
       std::move(extra));
@@ -1705,6 +1829,8 @@ JsNullLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
 
   return absl::make_unique<JsNullLiteral>(
       std::move(loc),
@@ -1713,7 +1839,9 @@ JsNullLiteral::FromJson(const nlohmann::json& json) {
       std::move(leading_comments),
       std::move(trailing_comments),
       std::move(inner_comments),
-      std::move(scope_uid));
+      std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols));
 }
 
 // =============================================================================
@@ -1832,6 +1960,8 @@ JsStringLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsStringLiteral::GetValue(json));
   MALDOCA_ASSIGN_OR_RETURN(auto extra, JsStringLiteral::GetExtra(json));
 
@@ -1843,6 +1973,8 @@ JsStringLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value),
       std::move(extra));
 }
@@ -1881,6 +2013,8 @@ JsBooleanLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsBooleanLiteral::GetValue(json));
 
   return absl::make_unique<JsBooleanLiteral>(
@@ -1891,6 +2025,8 @@ JsBooleanLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value));
 }
 
@@ -1994,6 +2130,8 @@ JsNumericLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsNumericLiteral::GetValue(json));
   MALDOCA_ASSIGN_OR_RETURN(auto extra, JsNumericLiteral::GetExtra(json));
 
@@ -2005,6 +2143,8 @@ JsNumericLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value),
       std::move(extra));
 }
@@ -2109,6 +2249,8 @@ JsBigIntLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsBigIntLiteral::GetValue(json));
   MALDOCA_ASSIGN_OR_RETURN(auto extra, JsBigIntLiteral::GetExtra(json));
 
@@ -2120,6 +2262,8 @@ JsBigIntLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(value),
       std::move(extra));
 }
@@ -2313,6 +2457,8 @@ JsBlockStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsBlockStatement::GetBody(json));
   MALDOCA_ASSIGN_OR_RETURN(auto directives, JsBlockStatement::GetDirectives(json));
 
@@ -2324,6 +2470,8 @@ JsBlockStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(body),
       std::move(directives));
 }
@@ -2399,6 +2547,8 @@ JsExpressionStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto expression, JsExpressionStatement::GetExpression(json));
 
   return absl::make_unique<JsExpressionStatement>(
@@ -2409,6 +2559,8 @@ JsExpressionStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(expression));
 }
 
@@ -2429,6 +2581,8 @@ JsEmptyStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
 
   return absl::make_unique<JsEmptyStatement>(
       std::move(loc),
@@ -2437,7 +2591,9 @@ JsEmptyStatement::FromJson(const nlohmann::json& json) {
       std::move(leading_comments),
       std::move(trailing_comments),
       std::move(inner_comments),
-      std::move(scope_uid));
+      std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols));
 }
 
 // =============================================================================
@@ -2457,6 +2613,8 @@ JsDebuggerStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
 
   return absl::make_unique<JsDebuggerStatement>(
       std::move(loc),
@@ -2465,7 +2623,9 @@ JsDebuggerStatement::FromJson(const nlohmann::json& json) {
       std::move(leading_comments),
       std::move(trailing_comments),
       std::move(inner_comments),
-      std::move(scope_uid));
+      std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols));
 }
 
 // =============================================================================
@@ -2513,6 +2673,8 @@ JsWithStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto object, JsWithStatement::GetObject(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsWithStatement::GetBody(json));
 
@@ -2524,6 +2686,8 @@ JsWithStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(object),
       std::move(body));
 }
@@ -2559,6 +2723,8 @@ JsReturnStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsReturnStatement::GetArgument(json));
 
   return absl::make_unique<JsReturnStatement>(
@@ -2569,6 +2735,8 @@ JsReturnStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(argument));
 }
 
@@ -2617,6 +2785,8 @@ JsLabeledStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto label, JsLabeledStatement::GetLabel(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsLabeledStatement::GetBody(json));
 
@@ -2628,6 +2798,8 @@ JsLabeledStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(label),
       std::move(body));
 }
@@ -2663,6 +2835,8 @@ JsBreakStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto label, JsBreakStatement::GetLabel(json));
 
   return absl::make_unique<JsBreakStatement>(
@@ -2673,6 +2847,8 @@ JsBreakStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(label));
 }
 
@@ -2707,6 +2883,8 @@ JsContinueStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto label, JsContinueStatement::GetLabel(json));
 
   return absl::make_unique<JsContinueStatement>(
@@ -2717,6 +2895,8 @@ JsContinueStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(label));
 }
 
@@ -2779,6 +2959,8 @@ JsIfStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto test, JsIfStatement::GetTest(json));
   MALDOCA_ASSIGN_OR_RETURN(auto consequent, JsIfStatement::GetConsequent(json));
   MALDOCA_ASSIGN_OR_RETURN(auto alternate, JsIfStatement::GetAlternate(json));
@@ -2791,6 +2973,8 @@ JsIfStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(test),
       std::move(consequent),
       std::move(alternate));
@@ -2853,6 +3037,8 @@ JsSwitchCase::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto test, JsSwitchCase::GetTest(json));
   MALDOCA_ASSIGN_OR_RETURN(auto consequent, JsSwitchCase::GetConsequent(json));
 
@@ -2864,6 +3050,8 @@ JsSwitchCase::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(test),
       std::move(consequent));
 }
@@ -2925,6 +3113,8 @@ JsSwitchStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto discriminant, JsSwitchStatement::GetDiscriminant(json));
   MALDOCA_ASSIGN_OR_RETURN(auto cases, JsSwitchStatement::GetCases(json));
 
@@ -2936,6 +3126,8 @@ JsSwitchStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(discriminant),
       std::move(cases));
 }
@@ -2971,6 +3163,8 @@ JsThrowStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsThrowStatement::GetArgument(json));
 
   return absl::make_unique<JsThrowStatement>(
@@ -2981,6 +3175,8 @@ JsThrowStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(argument));
 }
 
@@ -3029,6 +3225,8 @@ JsCatchClause::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto param, JsCatchClause::GetParam(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsCatchClause::GetBody(json));
 
@@ -3040,6 +3238,8 @@ JsCatchClause::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(param),
       std::move(body));
 }
@@ -3103,6 +3303,8 @@ JsTryStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto block, JsTryStatement::GetBlock(json));
   MALDOCA_ASSIGN_OR_RETURN(auto handler, JsTryStatement::GetHandler(json));
   MALDOCA_ASSIGN_OR_RETURN(auto finalizer, JsTryStatement::GetFinalizer(json));
@@ -3115,6 +3317,8 @@ JsTryStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(block),
       std::move(handler),
       std::move(finalizer));
@@ -3165,6 +3369,8 @@ JsWhileStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto test, JsWhileStatement::GetTest(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsWhileStatement::GetBody(json));
 
@@ -3176,6 +3382,8 @@ JsWhileStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(test),
       std::move(body));
 }
@@ -3225,6 +3433,8 @@ JsDoWhileStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsDoWhileStatement::GetBody(json));
   MALDOCA_ASSIGN_OR_RETURN(auto test, JsDoWhileStatement::GetTest(json));
 
@@ -3236,6 +3446,8 @@ JsDoWhileStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(body),
       std::move(test));
 }
@@ -3307,6 +3519,8 @@ JsVariableDeclarator::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsVariableDeclarator::GetId(json));
   MALDOCA_ASSIGN_OR_RETURN(auto init, JsVariableDeclarator::GetInit(json));
 
@@ -3318,6 +3532,8 @@ JsVariableDeclarator::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id),
       std::move(init));
 }
@@ -3398,6 +3614,8 @@ JsVariableDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto declarations, JsVariableDeclaration::GetDeclarations(json));
   MALDOCA_ASSIGN_OR_RETURN(auto kind, JsVariableDeclaration::GetKind(json));
 
@@ -3409,6 +3627,8 @@ JsVariableDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(declarations),
       std::move(kind));
 }
@@ -3495,6 +3715,8 @@ JsForStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto init, JsForStatement::GetInit(json));
   MALDOCA_ASSIGN_OR_RETURN(auto test, JsForStatement::GetTest(json));
   MALDOCA_ASSIGN_OR_RETURN(auto update, JsForStatement::GetUpdate(json));
@@ -3508,6 +3730,8 @@ JsForStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(init),
       std::move(test),
       std::move(update),
@@ -3582,6 +3806,8 @@ JsForInStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto left, JsForInStatement::GetLeft(json));
   MALDOCA_ASSIGN_OR_RETURN(auto right, JsForInStatement::GetRight(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsForInStatement::GetBody(json));
@@ -3594,6 +3820,8 @@ JsForInStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(left),
       std::move(right),
       std::move(body));
@@ -3684,6 +3912,8 @@ JsForOfStatement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto left, JsForOfStatement::GetLeft(json));
   MALDOCA_ASSIGN_OR_RETURN(auto right, JsForOfStatement::GetRight(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsForOfStatement::GetBody(json));
@@ -3697,6 +3927,8 @@ JsForOfStatement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(left),
       std::move(right),
       std::move(body),
@@ -3736,6 +3968,8 @@ JsFunctionDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsFunction::GetId(json));
   MALDOCA_ASSIGN_OR_RETURN(auto params, JsFunction::GetParams(json));
   MALDOCA_ASSIGN_OR_RETURN(auto generator, JsFunction::GetGenerator(json));
@@ -3750,6 +3984,8 @@ JsFunctionDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id),
       std::move(params),
       std::move(generator),
@@ -3790,6 +4026,8 @@ JsSuper::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
 
   return absl::make_unique<JsSuper>(
       std::move(loc),
@@ -3798,7 +4036,9 @@ JsSuper::FromJson(const nlohmann::json& json) {
       std::move(leading_comments),
       std::move(trailing_comments),
       std::move(inner_comments),
-      std::move(scope_uid));
+      std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols));
 }
 
 // =============================================================================
@@ -3834,6 +4074,8 @@ JsImport::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
 
   return absl::make_unique<JsImport>(
       std::move(loc),
@@ -3842,7 +4084,9 @@ JsImport::FromJson(const nlohmann::json& json) {
       std::move(leading_comments),
       std::move(trailing_comments),
       std::move(inner_comments),
-      std::move(scope_uid));
+      std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols));
 }
 
 // =============================================================================
@@ -3862,6 +4106,8 @@ JsThisExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
 
   return absl::make_unique<JsThisExpression>(
       std::move(loc),
@@ -3870,7 +4116,9 @@ JsThisExpression::FromJson(const nlohmann::json& json) {
       std::move(leading_comments),
       std::move(trailing_comments),
       std::move(inner_comments),
-      std::move(scope_uid));
+      std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols));
 }
 
 // =============================================================================
@@ -3913,6 +4161,8 @@ JsArrowFunctionExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsFunction::GetId(json));
   MALDOCA_ASSIGN_OR_RETURN(auto params, JsFunction::GetParams(json));
   MALDOCA_ASSIGN_OR_RETURN(auto generator, JsFunction::GetGenerator(json));
@@ -3927,6 +4177,8 @@ JsArrowFunctionExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id),
       std::move(params),
       std::move(generator),
@@ -3982,6 +4234,8 @@ JsYieldExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsYieldExpression::GetArgument(json));
   MALDOCA_ASSIGN_OR_RETURN(auto delegate, JsYieldExpression::GetDelegate(json));
 
@@ -3993,6 +4247,8 @@ JsYieldExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(argument),
       std::move(delegate));
 }
@@ -4028,6 +4284,8 @@ JsAwaitExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsAwaitExpression::GetArgument(json));
 
   return absl::make_unique<JsAwaitExpression>(
@@ -4038,6 +4296,8 @@ JsAwaitExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(argument));
 }
 
@@ -4088,6 +4348,8 @@ JsSpreadElement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsSpreadElement::GetArgument(json));
 
   return absl::make_unique<JsSpreadElement>(
@@ -4098,6 +4360,8 @@ JsSpreadElement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(argument));
 }
 
@@ -4153,6 +4417,8 @@ JsArrayExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto elements, JsArrayExpression::GetElements(json));
 
   return absl::make_unique<JsArrayExpression>(
@@ -4163,6 +4429,8 @@ JsArrayExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(elements));
 }
 
@@ -4290,6 +4558,8 @@ JsObjectProperty::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto key, JsObjectMember::GetKey(json));
   MALDOCA_ASSIGN_OR_RETURN(auto computed, JsObjectMember::GetComputed(json));
   MALDOCA_ASSIGN_OR_RETURN(auto shorthand, JsObjectProperty::GetShorthand(json));
@@ -4303,6 +4573,8 @@ JsObjectProperty::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(key),
       std::move(computed),
       std::move(shorthand),
@@ -4359,6 +4631,8 @@ JsObjectMethod::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto key, JsObjectMember::GetKey(json));
   MALDOCA_ASSIGN_OR_RETURN(auto computed, JsObjectMember::GetComputed(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsFunction::GetId(json));
@@ -4376,6 +4650,8 @@ JsObjectMethod::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(key),
       std::move(computed),
       std::move(id),
@@ -4441,6 +4717,8 @@ JsObjectExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto properties_, JsObjectExpression::GetProperties(json));
 
   return absl::make_unique<JsObjectExpression>(
@@ -4451,6 +4729,8 @@ JsObjectExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(properties_));
 }
 
@@ -4471,6 +4751,8 @@ JsFunctionExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsFunction::GetId(json));
   MALDOCA_ASSIGN_OR_RETURN(auto params, JsFunction::GetParams(json));
   MALDOCA_ASSIGN_OR_RETURN(auto generator, JsFunction::GetGenerator(json));
@@ -4485,6 +4767,8 @@ JsFunctionExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id),
       std::move(params),
       std::move(generator),
@@ -4558,6 +4842,8 @@ JsUnaryExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto operator_, JsUnaryExpression::GetOperator(json));
   MALDOCA_ASSIGN_OR_RETURN(auto prefix, JsUnaryExpression::GetPrefix(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsUnaryExpression::GetArgument(json));
@@ -4570,6 +4856,8 @@ JsUnaryExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(operator_),
       std::move(prefix),
       std::move(argument));
@@ -4641,6 +4929,8 @@ JsUpdateExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto operator_, JsUpdateExpression::GetOperator(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsUpdateExpression::GetArgument(json));
   MALDOCA_ASSIGN_OR_RETURN(auto prefix, JsUpdateExpression::GetPrefix(json));
@@ -4653,6 +4943,8 @@ JsUpdateExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(operator_),
       std::move(argument),
       std::move(prefix));
@@ -4730,6 +5022,8 @@ JsBinaryExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto operator_, JsBinaryExpression::GetOperator(json));
   MALDOCA_ASSIGN_OR_RETURN(auto left, JsBinaryExpression::GetLeft(json));
   MALDOCA_ASSIGN_OR_RETURN(auto right, JsBinaryExpression::GetRight(json));
@@ -4742,6 +5036,8 @@ JsBinaryExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(operator_),
       std::move(left),
       std::move(right));
@@ -4810,6 +5106,8 @@ JsAssignmentExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto operator_, JsAssignmentExpression::GetOperator(json));
   MALDOCA_ASSIGN_OR_RETURN(auto left, JsAssignmentExpression::GetLeft(json));
   MALDOCA_ASSIGN_OR_RETURN(auto right, JsAssignmentExpression::GetRight(json));
@@ -4822,6 +5120,8 @@ JsAssignmentExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(operator_),
       std::move(left),
       std::move(right));
@@ -4890,6 +5190,8 @@ JsLogicalExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto operator_, JsLogicalExpression::GetOperator(json));
   MALDOCA_ASSIGN_OR_RETURN(auto left, JsLogicalExpression::GetLeft(json));
   MALDOCA_ASSIGN_OR_RETURN(auto right, JsLogicalExpression::GetRight(json));
@@ -4902,6 +5204,8 @@ JsLogicalExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(operator_),
       std::move(left),
       std::move(right));
@@ -4987,6 +5291,8 @@ JsMemberExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto object, JsMemberExpression::GetObject(json));
   MALDOCA_ASSIGN_OR_RETURN(auto property, JsMemberExpression::GetProperty(json));
   MALDOCA_ASSIGN_OR_RETURN(auto computed, JsMemberExpression::GetComputed(json));
@@ -4999,6 +5305,8 @@ JsMemberExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(object),
       std::move(property),
       std::move(computed));
@@ -5092,6 +5400,8 @@ JsOptionalMemberExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto object, JsOptionalMemberExpression::GetObject(json));
   MALDOCA_ASSIGN_OR_RETURN(auto property, JsOptionalMemberExpression::GetProperty(json));
   MALDOCA_ASSIGN_OR_RETURN(auto computed, JsOptionalMemberExpression::GetComputed(json));
@@ -5105,6 +5415,8 @@ JsOptionalMemberExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(object),
       std::move(property),
       std::move(computed),
@@ -5170,6 +5482,8 @@ JsConditionalExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto test, JsConditionalExpression::GetTest(json));
   MALDOCA_ASSIGN_OR_RETURN(auto alternate, JsConditionalExpression::GetAlternate(json));
   MALDOCA_ASSIGN_OR_RETURN(auto consequent, JsConditionalExpression::GetConsequent(json));
@@ -5182,6 +5496,8 @@ JsConditionalExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(test),
       std::move(alternate),
       std::move(consequent));
@@ -5265,6 +5581,8 @@ JsCallExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto callee, JsCallExpression::GetCallee(json));
   MALDOCA_ASSIGN_OR_RETURN(auto arguments, JsCallExpression::GetArguments(json));
 
@@ -5276,6 +5594,8 @@ JsCallExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(callee),
       std::move(arguments));
 }
@@ -5364,6 +5684,8 @@ JsOptionalCallExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto callee, JsOptionalCallExpression::GetCallee(json));
   MALDOCA_ASSIGN_OR_RETURN(auto arguments, JsOptionalCallExpression::GetArguments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto optional, JsOptionalCallExpression::GetOptional(json));
@@ -5376,6 +5698,8 @@ JsOptionalCallExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(callee),
       std::move(arguments),
       std::move(optional));
@@ -5459,6 +5783,8 @@ JsNewExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto callee, JsNewExpression::GetCallee(json));
   MALDOCA_ASSIGN_OR_RETURN(auto arguments, JsNewExpression::GetArguments(json));
 
@@ -5470,6 +5796,8 @@ JsNewExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(callee),
       std::move(arguments));
 }
@@ -5517,6 +5845,8 @@ JsSequenceExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto expressions, JsSequenceExpression::GetExpressions(json));
 
   return absl::make_unique<JsSequenceExpression>(
@@ -5527,6 +5857,8 @@ JsSequenceExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(expressions));
 }
 
@@ -5561,6 +5893,8 @@ JsParenthesizedExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto expression, JsParenthesizedExpression::GetExpression(json));
 
   return absl::make_unique<JsParenthesizedExpression>(
@@ -5571,6 +5905,8 @@ JsParenthesizedExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(expression));
 }
 
@@ -5674,6 +6010,8 @@ JsTemplateElement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto tail, JsTemplateElement::GetTail(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsTemplateElement::GetValue(json));
 
@@ -5685,6 +6023,8 @@ JsTemplateElement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(tail),
       std::move(value));
 }
@@ -5758,6 +6098,8 @@ JsTemplateLiteral::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto quasis, JsTemplateLiteral::GetQuasis(json));
   MALDOCA_ASSIGN_OR_RETURN(auto expressions, JsTemplateLiteral::GetExpressions(json));
 
@@ -5769,6 +6111,8 @@ JsTemplateLiteral::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(quasis),
       std::move(expressions));
 }
@@ -5818,6 +6162,8 @@ JsTaggedTemplateExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto tag, JsTaggedTemplateExpression::GetTag(json));
   MALDOCA_ASSIGN_OR_RETURN(auto quasi, JsTaggedTemplateExpression::GetQuasi(json));
 
@@ -5829,6 +6175,8 @@ JsTaggedTemplateExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(tag),
       std::move(quasi));
 }
@@ -5880,6 +6228,8 @@ JsRestElement::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto argument, JsRestElement::GetArgument(json));
 
   return absl::make_unique<JsRestElement>(
@@ -5890,6 +6240,8 @@ JsRestElement::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(argument));
 }
 
@@ -5946,6 +6298,8 @@ JsObjectPattern::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto properties_, JsObjectPattern::GetProperties(json));
 
   return absl::make_unique<JsObjectPattern>(
@@ -5956,6 +6310,8 @@ JsObjectPattern::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(properties_));
 }
 
@@ -6002,6 +6358,8 @@ JsArrayPattern::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto elements, JsArrayPattern::GetElements(json));
 
   return absl::make_unique<JsArrayPattern>(
@@ -6012,6 +6370,8 @@ JsArrayPattern::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(elements));
 }
 
@@ -6060,6 +6420,8 @@ JsAssignmentPattern::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto left, JsAssignmentPattern::GetLeft(json));
   MALDOCA_ASSIGN_OR_RETURN(auto right, JsAssignmentPattern::GetRight(json));
 
@@ -6071,6 +6433,8 @@ JsAssignmentPattern::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(left),
       std::move(right));
 }
@@ -6173,6 +6537,8 @@ JsClassMethod::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsFunction::GetId(json));
   MALDOCA_ASSIGN_OR_RETURN(auto params, JsFunction::GetParams(json));
   MALDOCA_ASSIGN_OR_RETURN(auto generator, JsFunction::GetGenerator(json));
@@ -6191,6 +6557,8 @@ JsClassMethod::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id),
       std::move(params),
       std::move(generator),
@@ -6300,6 +6668,8 @@ JsClassPrivateMethod::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsFunction::GetId(json));
   MALDOCA_ASSIGN_OR_RETURN(auto params, JsFunction::GetParams(json));
   MALDOCA_ASSIGN_OR_RETURN(auto generator, JsFunction::GetGenerator(json));
@@ -6318,6 +6688,8 @@ JsClassPrivateMethod::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(id),
       std::move(params),
       std::move(generator),
@@ -6424,6 +6796,8 @@ JsClassProperty::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto key, JsClassProperty::GetKey(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsClassProperty::GetValue(json));
   MALDOCA_ASSIGN_OR_RETURN(auto static_, JsClassProperty::GetStatic(json));
@@ -6437,6 +6811,8 @@ JsClassProperty::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(key),
       std::move(value),
       std::move(static_),
@@ -6521,6 +6897,8 @@ JsClassPrivateProperty::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto key, JsClassPrivateProperty::GetKey(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsClassPrivateProperty::GetValue(json));
   MALDOCA_ASSIGN_OR_RETURN(auto static_, JsClassPrivateProperty::GetStatic(json));
@@ -6533,6 +6911,8 @@ JsClassPrivateProperty::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(key),
       std::move(value),
       std::move(static_));
@@ -6595,6 +6975,8 @@ JsClassBody::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsClassBody::GetBody(json));
 
   return absl::make_unique<JsClassBody>(
@@ -6605,6 +6987,8 @@ JsClassBody::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(body));
 }
 
@@ -6703,6 +7087,8 @@ JsClassDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto super_class, JsClass::GetSuperClass(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsClass::GetBody(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsClassDeclaration::GetId(json));
@@ -6715,6 +7101,8 @@ JsClassDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(super_class),
       std::move(body),
       std::move(id));
@@ -6751,6 +7139,8 @@ JsClassExpression::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto super_class, JsClass::GetSuperClass(json));
   MALDOCA_ASSIGN_OR_RETURN(auto body, JsClass::GetBody(json));
   MALDOCA_ASSIGN_OR_RETURN(auto id, JsClassExpression::GetId(json));
@@ -6763,6 +7153,8 @@ JsClassExpression::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(super_class),
       std::move(body),
       std::move(id));
@@ -6813,6 +7205,8 @@ JsMetaProperty::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto meta, JsMetaProperty::GetMeta(json));
   MALDOCA_ASSIGN_OR_RETURN(auto property, JsMetaProperty::GetProperty(json));
 
@@ -6824,6 +7218,8 @@ JsMetaProperty::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(meta),
       std::move(property));
 }
@@ -6922,6 +7318,8 @@ JsImportSpecifier::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto imported, JsImportSpecifier::GetImported(json));
   MALDOCA_ASSIGN_OR_RETURN(auto local, JsImportSpecifier::GetLocal(json));
 
@@ -6933,6 +7331,8 @@ JsImportSpecifier::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(imported),
       std::move(local));
 }
@@ -6984,6 +7384,8 @@ JsImportDefaultSpecifier::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto local, JsImportDefaultSpecifier::GetLocal(json));
 
   return absl::make_unique<JsImportDefaultSpecifier>(
@@ -6994,6 +7396,8 @@ JsImportDefaultSpecifier::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(local));
 }
 
@@ -7044,6 +7448,8 @@ JsImportNamespaceSpecifier::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto local, JsImportNamespaceSpecifier::GetLocal(json));
 
   return absl::make_unique<JsImportNamespaceSpecifier>(
@@ -7054,6 +7460,8 @@ JsImportNamespaceSpecifier::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(local));
 }
 
@@ -7102,6 +7510,8 @@ JsImportAttribute::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto key, JsImportAttribute::GetKey(json));
   MALDOCA_ASSIGN_OR_RETURN(auto value, JsImportAttribute::GetValue(json));
 
@@ -7113,6 +7523,8 @@ JsImportAttribute::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(key),
       std::move(value));
 }
@@ -7200,6 +7612,8 @@ JsImportDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto specifiers, JsImportDeclaration::GetSpecifiers(json));
   MALDOCA_ASSIGN_OR_RETURN(auto source, JsImportDeclaration::GetSource(json));
   MALDOCA_ASSIGN_OR_RETURN(auto assertions, JsImportDeclaration::GetAssertions(json));
@@ -7212,6 +7626,8 @@ JsImportDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(specifiers),
       std::move(source),
       std::move(assertions));
@@ -7280,6 +7696,8 @@ JsExportSpecifier::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto exported, JsExportSpecifier::GetExported(json));
   MALDOCA_ASSIGN_OR_RETURN(auto local, JsExportSpecifier::GetLocal(json));
 
@@ -7291,6 +7709,8 @@ JsExportSpecifier::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(exported),
       std::move(local));
 }
@@ -7392,6 +7812,8 @@ JsExportNamedDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto declaration, JsExportNamedDeclaration::GetDeclaration(json));
   MALDOCA_ASSIGN_OR_RETURN(auto specifiers, JsExportNamedDeclaration::GetSpecifiers(json));
   MALDOCA_ASSIGN_OR_RETURN(auto source, JsExportNamedDeclaration::GetSource(json));
@@ -7405,6 +7827,8 @@ JsExportNamedDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(declaration),
       std::move(specifiers),
       std::move(source),
@@ -7453,6 +7877,8 @@ JsExportDefaultDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto declaration, JsExportDefaultDeclaration::GetDeclaration(json));
 
   return absl::make_unique<JsExportDefaultDeclaration>(
@@ -7463,6 +7889,8 @@ JsExportDefaultDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(declaration));
 }
 
@@ -7523,6 +7951,8 @@ JsExportAllDeclaration::FromJson(const nlohmann::json& json) {
   MALDOCA_ASSIGN_OR_RETURN(auto trailing_comments, JsNode::GetTrailingComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto inner_comments, JsNode::GetInnerComments(json));
   MALDOCA_ASSIGN_OR_RETURN(auto scope_uid, JsNode::GetScopeUid(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto referenced_symbol, JsNode::GetReferencedSymbol(json));
+  MALDOCA_ASSIGN_OR_RETURN(auto defined_symbols, JsNode::GetDefinedSymbols(json));
   MALDOCA_ASSIGN_OR_RETURN(auto source, JsExportAllDeclaration::GetSource(json));
   MALDOCA_ASSIGN_OR_RETURN(auto assertions, JsExportAllDeclaration::GetAssertions(json));
 
@@ -7534,6 +7964,8 @@ JsExportAllDeclaration::FromJson(const nlohmann::json& json) {
       std::move(trailing_comments),
       std::move(inner_comments),
       std::move(scope_uid),
+      std::move(referenced_symbol),
+      std::move(defined_symbols),
       std::move(source),
       std::move(assertions));
 }

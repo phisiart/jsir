@@ -26,6 +26,7 @@ cc_library(
     srcs = ["pass.cc"],
     hdrs = ["pass.h"],
     deps = [
+        "//maldoca/js/ast",
         "//maldoca/js/ir",
         "//maldoca/js/ir/analyses:dataflow_analysis",
         "//maldoca/js/ir/analyses/constant_propagation:analysis",

@@ -47,7 +47,11 @@ cc_library(
     hdrs = [
         "ast_visitor.h",
     ],
-    deps = [":ast"],
+    deps = [
+        ":ast",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/memory",
+    ],
 )
 
 cc_library(

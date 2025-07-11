@@ -309,6 +309,7 @@ cc_library(
         "@abseil-cpp//absl/types:span",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -355,11 +356,7 @@ cc_library(
     srcs = ["jsir_gen_lib.cc"],
     hdrs = ["jsir_gen_lib.h"],
     deps = [
-        ":ir",
         "//maldoca/base:ret_check",
-        "//maldoca/base:status",
-        "//maldoca/js/ast",
-        "//maldoca/js/ast:ast_util",
         "//maldoca/js/babel",
         "//maldoca/js/babel:babel_cc_proto",
         "//maldoca/js/driver",
@@ -376,14 +373,8 @@ cc_library(
         "@abseil-cpp//absl/log:check",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/time",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Analysis",
-        "@llvm-project//mlir:ControlFlowDialect",
-        "@llvm-project//mlir:FuncDialect",
-        "@llvm-project//mlir:IR",
+        "@abseil-cpp//absl/strings:str_format",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
         "@protobuf//:duration_cc_proto",
     ],
 )

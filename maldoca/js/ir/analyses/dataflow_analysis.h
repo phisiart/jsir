@@ -15,10 +15,9 @@
 #ifndef MALDOCA_JS_IR_ANALYSES_DATAFLOW_ANALYSIS_H_
 #define MALDOCA_JS_IR_ANALYSES_DATAFLOW_ANALYSIS_H_
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
-#include <type_traits>
+#include <tuple>
 #include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
@@ -26,18 +25,21 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
-#include "mlir/IR/BlockSupport.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
+#include "absl/log/check.h"
 #include "maldoca/js/ir/analyses/state.h"
+#include "maldoca/js/ir/ir.h"
 
 namespace maldoca {
 
@@ -76,6 +78,75 @@ class JsirStateElement : public mlir::AnalysisState {
 };
 
 }  // namespace detail
+}  // namespace maldoca
+
+namespace llvm {
+
+template <typename RangeT> hash_code hash_combine_range(RangeT &&R) {
+  return hash_combine_range(adl_begin(R), adl_end(R));
+}
+
+// Provide DenseMapInfo for SmallVector of a type which has info.
+template <typename T, unsigned N> struct DenseMapInfo<llvm::SmallVector<T, N>> {
+  static SmallVector<T, N> getEmptyKey() {
+    return {DenseMapInfo<T>::getEmptyKey()};
+  }
+
+  static SmallVector<T, N> getTombstoneKey() {
+    return {DenseMapInfo<T>::getTombstoneKey()};
+  }
+
+  static unsigned getHashValue(const SmallVector<T, N> &V) {
+    return static_cast<unsigned>(hash_combine_range(V));
+  }
+
+  static bool isEqual(const SmallVector<T, N> &LHS,
+                      const SmallVector<T, N> &RHS) {
+    return LHS == RHS;
+  }
+};
+
+}  // namespace llvm
+
+namespace maldoca {
+
+class JsirGeneralCfgEdge
+    : public mlir::GenericLatticeAnchorBase<
+          JsirGeneralCfgEdge,
+          std::tuple<mlir::ProgramPoint *, mlir::ProgramPoint *, unsigned int,
+                     mlir::SmallVector<mlir::Value>,
+                     mlir::SmallVector<mlir::Value>>> {
+ public:
+  using Base::Base;
+
+  mlir::ProgramPoint *getPred() const { return std::get<0>(getValue()); }
+
+  mlir::ProgramPoint *getSucc() const { return std::get<1>(getValue()); }
+
+  // TODO Storing the value vectors in the CFG edge might make this unneeded?
+  unsigned int getBranchSuccIndex() const { return std::get<2>(getValue()); }
+
+  const mlir::SmallVector<mlir::Value> &getPredValues() const {
+    return std::get<3>(getValue());
+  }
+
+  const mlir::SmallVector<mlir::Value> &getSuccValues() const {
+    return std::get<4>(getValue());
+  }
+
+  void print(llvm::raw_ostream &os) const override {
+    getPred()->print(os);
+    os << "\n -> \n";
+    getSucc()->print(os);
+    os << " with index " << getBranchSuccIndex() << "\n";
+  }
+
+  mlir::Location getLoc() const override {
+    return mlir::FusedLoc::get(getPred()->getBlock()->getParent()->getContext(),
+                               {getPred()->getBlock()->getParent()->getLoc(),
+                                getSucc()->getBlock()->getParent()->getLoc()});
+  }
+};
 
 template <typename T>
 class JsirStateRef {
@@ -210,14 +281,13 @@ enum class DataflowDirection { kForward, kBackward };
 // A dataflow analysis API that attaches lattices to operations. This analysis
 // supports both forward and backward analysis.
 template <typename StateT, DataflowDirection direction>
-class JsirDenseDataFlowAnalysis
-    : public mlir::DataFlowAnalysis,
-      public JsirDataFlowAnalysisPrinter,
-      public JsirDenseStates<JsirStateRef<StateT>> {
+class JsirDenseDataFlowAnalysis : public mlir::DataFlowAnalysis,
+                                  public JsirDataFlowAnalysisPrinter,
+                                  public JsirDenseStates<JsirStateRef<StateT>> {
  public:
   explicit JsirDenseDataFlowAnalysis(mlir::DataFlowSolver &solver)
       : mlir::DataFlowAnalysis(solver), solver_(solver) {
-    registerAnchorKind<mlir::dataflow::CFGEdge>();
+    registerAnchorKind<JsirGeneralCfgEdge>();
   }
 
   // Set the initial state of an entry block for forward analysis or exit block
@@ -267,18 +337,52 @@ class JsirDenseDataFlowAnalysis
   void PrintOp(mlir::Operation *op, size_t num_indents,
                mlir::AsmState &asm_state, llvm::raw_ostream &os) override;
 
+  using JsirDataFlowAnalysisPrinter::PrintOp;
+
   void PrintRegion(mlir::Region &region, size_t num_indents,
                    mlir::AsmState &asm_state, llvm::raw_ostream &os);
 
+  bool IsEntryBlock(mlir::Block *block);
+
+  // When we visit the op, visit all the CFG edges associated with that op.
+  absl::flat_hash_map<mlir::Operation *, std::vector<JsirGeneralCfgEdge *>>
+      op_to_cfg_edges_;
+
+  absl::flat_hash_map<mlir::Block *, std::vector<JsirGeneralCfgEdge *>>
+      block_to_cfg_edges_;
+
  protected:
-  mlir::dataflow::CFGEdge* GetCFGEdge(mlir::Block *pred, mlir::Block *succ);
+  JsirGeneralCfgEdge *GetCFGEdge(mlir::ProgramPoint *pred,
+                                 mlir::ProgramPoint *succ,
+                                 unsigned int branch_succ_index);
+
+  void EmplaceCFGEdge(mlir::ProgramPoint *from, mlir::ProgramPoint *to,
+                      unsigned int branch_succ_index, mlir::Operation *op);
+
+  void EmplaceCFGEdgesFromRegion(mlir::Region &from_exits_of,
+                                 mlir::ProgramPoint *to,
+                                 unsigned int branch_succ_index,
+                                 mlir::Operation *op);
+
+  void EmplaceCFGEdgesBetweenRegions(mlir::Region &from_exits_of,
+                                     mlir::Region &to_entry_of,
+                                     unsigned int branch_succ_index,
+                                     mlir::Operation *op);
+
+  // TODO(b/425421947) Eventually we won't need this function.
+  bool IsBlockCfg(JsirGeneralCfgEdge *edge) {
+    return edge->getPred()->isBlockEnd() && edge->getSucc()->isBlockStart() &&
+           edge->getPred()->getBlock()->mightHaveTerminator() &&
+           (edge->getPred()->getBlock()->getParent() ==
+            edge->getSucc()->getBlock()->getParent());
+  }
 
   // Gets the state at the program point.
   template <typename T>
   JsirStateRef<T> GetStateImpl(mlir::LatticeAnchor anchor);
 
   mlir::LogicalResult initialize(mlir::Operation *op) override;
-  virtual void InitializeBlock(mlir::Block *block);
+  void InitializeBlock(mlir::Block *block);
 
   // Since our analysis algorithm is based on MLIR's dataflow analysis, we need
   // to set up the dependency information between basic blocks so that the
@@ -300,8 +404,7 @@ class JsirDenseDataFlowAnalysis
   // block to the end of the predecessor for a backward analysis.
   // `branch_succ_index` is the index of the CFG edge among all edges from the
   // predecessor. This is necessary for sparse values.
-  virtual void VisitCFGEdge(mlir::Block *pred, unsigned int branch_succ_index,
-                            mlir::Block *succ);
+  virtual void VisitCFGEdge(JsirGeneralCfgEdge *edge);
 
   // Callbacks for `PrintOp`. See comments of `PrintOp` for the format.
   virtual void PrintAtBlockEntry(mlir::Block &block, size_t num_indents,
@@ -395,11 +498,10 @@ class JsirDataFlowAnalysis
 
  protected:
   using Base::GetCFGEdge;
+  using Base::InitializeBlockDependencies;
   using Base::VisitBlock;
   using Base::VisitOp;
-  using Base::InitializeBlockDependencies;
-  void VisitCFGEdge(mlir::Block *pred, unsigned int branch_succ_index,
-                    mlir::Block *succ) override;
+  void VisitCFGEdge(JsirGeneralCfgEdge *edge) override;
 
   // Helper function to get the `StateRef`s for the operands and results of an
   // op. For forward analysis, the input should be the operands and the output
@@ -477,10 +579,57 @@ void JsirStateRef<T>::Join(const T &lattice) {
 // =============================================================================
 
 template <typename StateT, DataflowDirection direction>
-mlir::dataflow::CFGEdge*
-JsirDenseDataFlowAnalysis<StateT, direction>::GetCFGEdge(
-    mlir::Block *pred, mlir::Block *succ) {
-  return getLatticeAnchor<mlir::dataflow::CFGEdge>(pred, succ);
+JsirGeneralCfgEdge *JsirDenseDataFlowAnalysis<StateT, direction>::GetCFGEdge(
+    mlir::ProgramPoint *pred, mlir::ProgramPoint *succ,
+    unsigned int branch_succ_index) {
+  llvm::SmallVector<mlir::Value> pred_values;
+  llvm::SmallVector<mlir::Value> succ_values;
+
+  // Is this a traditional CFG edge (as opposed to a general one)?
+  if (pred->isBlockEnd() && succ->isBlockStart() &&
+      pred->getBlock()->mightHaveTerminator() &&
+      (pred->getBlock()->getParent() == succ->getBlock()->getParent())) {
+    auto term_op = pred->getBlock()->getTerminator();
+    auto pred_branch = llvm::dyn_cast<mlir::BranchOpInterface>(term_op);
+    pred_values = pred_branch.getSuccessorOperands(branch_succ_index)
+                      .getForwardedOperands();
+    succ_values = {succ->getBlock()->getArguments().begin(),
+                   succ->getBlock()->getArguments().end()};
+  }
+
+  return getLatticeAnchor<JsirGeneralCfgEdge>(pred, succ, branch_succ_index,
+                                              pred_values, succ_values);
+}
+
+template <typename StateT, DataflowDirection direction>
+void JsirDenseDataFlowAnalysis<StateT, direction>::EmplaceCFGEdge(
+    mlir::ProgramPoint *from, mlir::ProgramPoint *to,
+    unsigned int branch_succ_index, mlir::Operation *op) {
+  op_to_cfg_edges_[op].push_back(GetCFGEdge(from, to, branch_succ_index));
+  auto from_state = GetStateImpl<StateT>(from);
+  from_state.AddDependent(getProgramPointAfter(op));
+}
+
+template <typename StateT, DataflowDirection direction>
+void JsirDenseDataFlowAnalysis<StateT, direction>::EmplaceCFGEdgesFromRegion(
+    mlir::Region &from_exits_of, mlir::ProgramPoint *to,
+    unsigned int branch_succ_index, mlir::Operation *op) {
+  for (mlir::Block &block : from_exits_of) {
+    if (block.getSuccessors().empty()) {
+      mlir::ProgramPoint *after_block = getProgramPointAfter(&block);
+      EmplaceCFGEdge(after_block, to, branch_succ_index, op);
+    }
+  }
+}
+
+template <typename StateT, DataflowDirection direction>
+void JsirDenseDataFlowAnalysis<StateT, direction>::
+    EmplaceCFGEdgesBetweenRegions(mlir::Region &from_exits_of,
+                                  mlir::Region &to_entry_of,
+                                  unsigned int branch_succ_index,
+                                  mlir::Operation *op) {
+  mlir::ProgramPoint *entry = getProgramPointBefore(&to_entry_of.front());
+  EmplaceCFGEdgesFromRegion(from_exits_of, entry, branch_succ_index, op);
 }
 
 template <typename StateT, DataflowDirection direction>
@@ -593,7 +742,7 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::PrintRegion(
   os << "{\n";
   {
     llvm::SaveAndRestore<size_t> num_indents_in_region{num_indents,
-                                                        num_indents + 2};
+                                                       num_indents + 2};
 
     for (mlir::Block &block : region.getBlocks()) {
       os.indent(num_indents);
@@ -614,6 +763,37 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::PrintRegion(
   }
   os.indent(num_indents);
   os << "}";
+}
+
+template <typename StateT, DataflowDirection direction>
+bool JsirDenseDataFlowAnalysis<StateT, direction>::IsEntryBlock(
+    mlir::Block *block) {
+  mlir::Operation *parent_op = block->getParentOp();
+  if (llvm::isa<JsirProgramOp>(parent_op)) {
+    return true;
+  }
+  if (llvm::isa<JsirFileOp>(parent_op)) {
+    return true;
+  }
+
+  // TODO(tzx): Rethink this. Function parameters should be UNKNOWN but
+  // other variables should be UNINIT.
+  if (llvm::isa<JsirFunctionDeclarationOp>(parent_op)) {
+    return true;
+  }
+  if (llvm::isa<JsirFunctionExpressionOp>(parent_op)) {
+    return true;
+  }
+  if (llvm::isa<JsirObjectMethodOp>(parent_op)) {
+    return true;
+  }
+  if (llvm::isa<JsirClassMethodOp>(parent_op)) {
+    return true;
+  }
+  if (parent_op->getParentOp() == nullptr) {
+    return true;
+  }
+  return false;
 }
 
 // Initializes states on all program points:
@@ -641,6 +821,188 @@ mlir::LogicalResult JsirDenseDataFlowAnalysis<StateT, direction>::initialize(
     }
   }
 
+  // ┌─────◄
+  // │     jshir.if_statement (
+  // ├─────► ┌───────────────┐
+  // │       │ true region   │
+  // │  ┌──◄ └───────────────┘
+  // └──│──► ┌───────────────┐
+  //    │    │ false region  │
+  //    ├──◄ └───────────────┘
+  //    │  );
+  //    └──►
+  if (auto if_op = mlir::dyn_cast<JshirIfStatementOp>(op); if_op != nullptr) {
+    mlir::ProgramPoint *before_if = getProgramPointBefore(if_op);
+    mlir::ProgramPoint *after_if = getProgramPointAfter(if_op);
+
+    const auto regions = {&if_op.getConsequent(), &if_op.getAlternate()};
+    for (auto [i, region] : llvm::enumerate(regions)) {
+      if (!region->empty()) {
+        mlir::ProgramPoint *to = getProgramPointBefore(&region->front());
+
+        EmplaceCFGEdge(before_if, to, i, if_op);
+        EmplaceCFGEdgesFromRegion(*region, after_if, 0, if_op);
+      }
+    }
+  }
+
+  // ┌─────◄
+  // │     jshir.block_statement (
+  // └─────► ┌───────────────┐
+  //         │ directives    │
+  //    ┌──◄ └───────────────┘
+  //    └──► ┌───────────────┐
+  //         │ body region   │
+  // ┌─────◄ └───────────────┘
+  // │     );
+  // └─────►
+  if (auto block_op = mlir::dyn_cast<JshirBlockStatementOp>(op);
+      block_op != nullptr) {
+    mlir::ProgramPoint *before_block = getProgramPointBefore(block_op);
+    mlir::ProgramPoint *after_block = getProgramPointAfter(block_op);
+    mlir::ProgramPoint *before_directives =
+        getProgramPointBefore(&block_op.getDirectives().front());
+
+    EmplaceCFGEdge(before_block, before_directives, 0, block_op);
+    EmplaceCFGEdgesBetweenRegions(block_op.getDirectives(), block_op.getBody(),
+                                  0, block_op);
+    EmplaceCFGEdgesFromRegion(block_op.getBody(), after_block, 0, block_op);
+  }
+
+  // ┌─────◄
+  // │     jshir.while_statement (
+  // ├─────► ┌───────────────┐
+  // │       │ test region   │
+  // │  ┌──◄ └───────────────┘
+  // │  ├──► ┌───────────────┐
+  // │  │    │ body region   │
+  // └──│──◄ └───────────────┘
+  //    │  );
+  //    └──►
+  if (auto while_op = mlir::dyn_cast<JshirWhileStatementOp>(op);
+      while_op != nullptr) {
+    mlir::ProgramPoint *before_while = getProgramPointBefore(while_op);
+    mlir::ProgramPoint *after_while = getProgramPointAfter(while_op);
+    mlir::ProgramPoint *before_test =
+        getProgramPointBefore(&while_op.getTest().front());
+
+    EmplaceCFGEdge(before_while, before_test, 0, while_op);
+    // TODO(b/425421947): The edges {test -> body} and {test -> after_while} are
+    // conditional.
+    EmplaceCFGEdgesBetweenRegions(while_op.getTest(), while_op.getBody(), 0,
+                                  while_op);
+    EmplaceCFGEdgesBetweenRegions(while_op.getBody(), while_op.getTest(), 0,
+                                  while_op);
+    EmplaceCFGEdgesFromRegion(while_op.getTest(), after_while, 1, while_op);
+  }
+
+  // ┌─────◄
+  // │     jshir.do_while_statement (
+  // ├─────► ┌───────────────┐
+  // │       │ body region   │
+  // │  ┌──◄ └───────────────┘
+  // │  └──► ┌───────────────┐
+  // │       │ test region   │
+  // ├─────◄ └───────────────┘
+  // │     );
+  // └─────►
+  if (auto do_while_op = mlir::dyn_cast<JshirDoWhileStatementOp>(op);
+      do_while_op != nullptr) {
+    mlir::ProgramPoint *before_do_while = getProgramPointBefore(do_while_op);
+    mlir::ProgramPoint *after_do_while = getProgramPointAfter(do_while_op);
+    mlir::ProgramPoint *before_body =
+        getProgramPointBefore(&do_while_op.getBody().front());
+
+    EmplaceCFGEdge(before_do_while, before_body, 0, do_while_op);
+    EmplaceCFGEdgesBetweenRegions(do_while_op.getBody(), do_while_op.getTest(),
+                                  0, do_while_op);
+    // TODO(b/425421947): The edges {test -> body} and {test -> after_do_while}
+    // are conditional.
+    EmplaceCFGEdgesBetweenRegions(do_while_op.getTest(), do_while_op.getBody(),
+                                  1, do_while_op);
+    EmplaceCFGEdgesFromRegion(do_while_op.getTest(), after_do_while, 0,
+                              do_while_op);
+  }
+
+  //    ┌─────◄
+  //    │     jshir.for_statement (
+  //    └─────► ┌───────────────┐
+  //            │ init region   │
+  // ┌────────◄ └───────────────┘
+  // ├────────► ┌───────────────┐
+  // │          │ test region   │
+  // │  ┌─────◄ └───────────────┘
+  // │  ├─────► ┌───────────────┐
+  // │  │       │ body region   │
+  // │  │  ┌──◄ └───────────────┘
+  // │  │  └──► ┌───────────────┐
+  // │  │       │ update region │
+  // └──│─────◄ └───────────────┘
+  //    │     );
+  //    └─────►
+  if (auto for_op = mlir::dyn_cast<JshirForStatementOp>(op);
+      for_op != nullptr) {
+    mlir::ProgramPoint *before_for = getProgramPointBefore(for_op);
+    mlir::ProgramPoint *after_for = getProgramPointAfter(for_op);
+    mlir::ProgramPoint *before_init =
+        getProgramPointBefore(&for_op.getInit().front());
+
+    EmplaceCFGEdge(before_for, before_init, 0, for_op);
+    EmplaceCFGEdgesBetweenRegions(for_op.getInit(), for_op.getTest(), 0,
+                                  for_op);
+    // TODO(b/425421947): The edges {test -> body} and {test -> after_for} are
+    // conditional.
+    EmplaceCFGEdgesBetweenRegions(for_op.getTest(), for_op.getBody(), 0,
+                                  for_op);
+    EmplaceCFGEdgesBetweenRegions(for_op.getBody(), for_op.getUpdate(), 0,
+                                  for_op);
+    EmplaceCFGEdgesBetweenRegions(for_op.getUpdate(), for_op.getTest(), 0,
+                                  for_op);
+    EmplaceCFGEdgesFromRegion(for_op.getTest(), after_for, 1, for_op);
+  }
+
+  // ┌─────◄
+  // │     jshir.for_in_statement (
+  // └──┬──► ┌───────────────┐
+  //    │    │ body region   │
+  // ┌──┴──◄ └───────────────┘
+  // │     );
+  // └─────►
+  if (auto for_in_op = mlir::dyn_cast<JshirForInStatementOp>(op);
+      for_in_op != nullptr) {
+    mlir::ProgramPoint *before_for_in = getProgramPointBefore(for_in_op);
+    mlir::ProgramPoint *after_for_in = getProgramPointAfter(for_in_op);
+
+    mlir::ProgramPoint *before_body =
+        getProgramPointBefore(&for_in_op.getBody().front());
+
+    EmplaceCFGEdge(before_for_in, before_body, 0, for_in_op);
+    EmplaceCFGEdgesBetweenRegions(for_in_op.getBody(), for_in_op.getBody(), 0,
+                                  for_in_op);
+    EmplaceCFGEdgesFromRegion(for_in_op.getBody(), after_for_in, 1, for_in_op);
+  }
+
+  // ┌─────◄
+  // │     jshir.for_of_statement (
+  // └──┬──► ┌───────────────┐
+  //    │    │ body region   │
+  // ┌──┴──◄ └───────────────┘
+  // │     );
+  // └─────►
+  if (auto for_of_op = mlir::dyn_cast<JshirForOfStatementOp>(op);
+      for_of_op != nullptr) {
+    mlir::ProgramPoint *before_for_of = getProgramPointBefore(for_of_op);
+    mlir::ProgramPoint *after_for_of = getProgramPointAfter(for_of_op);
+
+    mlir::ProgramPoint *before_body =
+        getProgramPointBefore(&for_of_op.getBody().front());
+
+    EmplaceCFGEdge(before_for_of, before_body, 0, for_of_op);
+    EmplaceCFGEdgesBetweenRegions(for_of_op.getBody(), for_of_op.getBody(), 0,
+                                  for_of_op);
+    EmplaceCFGEdgesFromRegion(for_of_op.getBody(), after_for_of, 1, for_of_op);
+  }
+
   // Recursively initialize.
   for (mlir::Region &region : op->getRegions()) {
     for (mlir::Block &block : region.getBlocks()) {
@@ -660,10 +1022,24 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::InitializeBlock(
   }
   InitializeBlockDependencies(block);
   if constexpr (direction == DataflowDirection::kForward) {
+    // TODO(b/425421947): Switch this to IsEntryBlock()? Currently these
+    // functions do not always agree with each other.
     if (block->isEntryBlock()) {
       JsirStateRef<StateT> block_state_ref = GetStateAtEntryOf(block);
       InitializeBoundaryBlock(block, block_state_ref);
     }
+
+    // Iterate over the predecessors of the non-entry block.
+    for (auto pred_it = block->pred_begin(), pred_end = block->pred_end();
+         pred_it != pred_end; ++pred_it) {
+      auto *edge =
+          GetCFGEdge(getProgramPointAfter(*pred_it),
+                     getProgramPointBefore(block), pred_it.getSuccessorIndex());
+      block_to_cfg_edges_[block].push_back(edge);
+    }
+
+    solver_.enqueue(
+        mlir::DataFlowSolver::WorkItem{getProgramPointBefore(block), this});
   } else if constexpr (direction == DataflowDirection::kBackward) {
     // The definition below is copied from https://reviews.llvm.org/D154713.
     auto is_exit_block = [](mlir::Block *b) {
@@ -683,6 +1059,19 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::InitializeBlock(
       JsirStateRef<StateT> block_state_ref = GetStateAtEndOf(block);
       InitializeBoundaryBlock(block, block_state_ref);
     }
+
+    // Iterate over the successors of the non-exit block.
+    for (auto succ_it = block->succ_begin(), succ_end = block->succ_end();
+         succ_it != succ_end; ++succ_it) {
+      // TODO: Design a unit test to cover multiple branches.
+      auto *edge =
+          GetCFGEdge(getProgramPointAfter(block),
+                     getProgramPointBefore(*succ_it), succ_it.getIndex());
+      block_to_cfg_edges_[block].push_back(edge);
+    }
+
+    solver_.enqueue(
+        mlir::DataFlowSolver::WorkItem{getProgramPointAfter(block), this});
   }
 }
 
@@ -742,35 +1131,24 @@ void JsirDenseDataFlowAnalysis<StateT, direction>::VisitOp(
 template <typename StateT, DataflowDirection direction>
 void JsirDenseDataFlowAnalysis<StateT, direction>::VisitBlock(
     mlir::Block *block) {
-  if constexpr (direction == DataflowDirection::kForward) {
-    // Iterate over the predecessors of the non-entry block.
-    for (auto pred_it = block->pred_begin(), pred_end = block->pred_end();
-        pred_it != pred_end; ++pred_it) {
-      VisitCFGEdge(*pred_it, pred_it.getSuccessorIndex(), block);
-    }
-  } else if constexpr (direction == DataflowDirection::kBackward) {
-    // Iterate over the successors of the non-exit block.
-    for (auto succ_it = block->succ_begin(), succ_end = block->succ_end();
-        succ_it != succ_end; ++succ_it) {
-      // TODO: Design a unit test to cover multiple branches.
-      VisitCFGEdge(block, succ_it.getIndex(), *succ_it);
-    }
+  for (auto *edge : block_to_cfg_edges_[block]) {
+    VisitCFGEdge(edge);
   }
 }
 
 template <typename StateT, DataflowDirection direction>
 void JsirDenseDataFlowAnalysis<StateT, direction>::VisitCFGEdge(
-    mlir::Block *pred, unsigned int branch_succ_index, mlir::Block *succ) {
-  JsirStateRef<StateT> pred_state_ref = GetStateAtEndOf(pred);
-  JsirStateRef<StateT> succ_state_ref = GetStateAtEntryOf(succ);
+    JsirGeneralCfgEdge *edge) {
+  JsirStateRef<StateT> pred_state_ref = GetStateImpl<StateT>(edge->getPred());
+  JsirStateRef<StateT> succ_state_ref = GetStateImpl<StateT>(edge->getSucc());
 
   if constexpr (direction == DataflowDirection::kForward) {
     // Merge the predecessor into the successor.
-    pred_state_ref.AddDependent(getProgramPointBefore(succ));
+    pred_state_ref.AddDependent(edge->getSucc());
     succ_state_ref.Join(pred_state_ref.value());
   } else if constexpr (direction == DataflowDirection::kBackward) {
     // Merge the successor into the predecessor.
-    succ_state_ref.AddDependent(getProgramPointBefore(pred));
+    succ_state_ref.AddDependent(edge->getPred());
     pred_state_ref.Join(succ_state_ref.value());
   }
 }
@@ -880,8 +1258,8 @@ template <typename ValueT, typename StateT, DataflowDirection direction>
 void JsirDataFlowAnalysis<ValueT, StateT, direction>::VisitOp(
     mlir::Operation *op, const StateT *input, JsirStateRef<StateT> output) {
   if constexpr (direction == DataflowDirection::kForward) {
-      auto [operands, result_state_refs] = GetValueStateRefs(op);
-      return VisitOp(op, operands, input, result_state_refs, output);
+    auto [operands, result_state_refs] = GetValueStateRefs(op);
+    return VisitOp(op, operands, input, result_state_refs, output);
   } else if constexpr (direction == DataflowDirection::kBackward) {
     auto [results, operand_state_refs] = GetValueStateRefs(op);
     return VisitOp(op, results, input, operand_state_refs, output);
@@ -890,52 +1268,23 @@ void JsirDataFlowAnalysis<ValueT, StateT, direction>::VisitOp(
 
 template <typename ValueT, typename StateT, DataflowDirection direction>
 void JsirDataFlowAnalysis<ValueT, StateT, direction>::VisitCFGEdge(
-    mlir::Block *pred, unsigned int branch_succ_index, mlir::Block *succ) {
+    JsirGeneralCfgEdge *edge) {
   // Match arguments from the predecessor to the successor.
-  if (auto pred_branch =
-          llvm::dyn_cast<mlir::BranchOpInterface>(pred->getTerminator())) {
-    mlir::SuccessorOperands branch_operands =
-        pred_branch.getSuccessorOperands(branch_succ_index);
-    for (const auto &succ_arg_it : llvm::enumerate(succ->getArguments())) {
-      mlir::Value succ_arg = succ_arg_it.value();
-      // Get the reference of the successor state.
-      JsirStateRef<ValueT> succ_state_ref = GetStateAt(succ_arg);
+  for (const auto [pred_value, succ_value] :
+       llvm::zip(edge->getPredValues(), edge->getSuccValues())) {
+    CHECK(pred_value != nullptr);
 
-      // Get the predecessor operand, if not null.
-      if (mlir::Value pred_operand = branch_operands[succ_arg_it.index()]) {
-        // When it is not null, we can safely gets a reference of the
-        // predecessor state.
-        JsirStateRef<ValueT> pred_state_ref = GetStateAt(pred_operand);
+    JsirStateRef<ValueT> succ_state_ref = GetStateAt(succ_value);
+    JsirStateRef<ValueT> pred_state_ref = GetStateAt(pred_value);
 
-        // Join the states when both predecessor and successor exists.
-        if constexpr (direction == DataflowDirection::kForward) {
-          succ_state_ref.Join(pred_state_ref.value());
-        } else if constexpr (direction == DataflowDirection::kBackward) {
-          pred_state_ref.Join(succ_state_ref.value());
-        }
-      } else {
-        if constexpr (direction == DataflowDirection::kForward) {
-          // Set the successor state as the bottom value of the lattice.
-          succ_state_ref.Write(BoundaryInitialValue());
-        } else if constexpr (direction == DataflowDirection::kBackward) {
-          // Nothing to write here, as the predecessor operand is null.
-        }
-      }
-    }
-  } else {
-    mlir::Block *block;
     if constexpr (direction == DataflowDirection::kForward) {
-      block = pred;
+      succ_state_ref.Join(pred_state_ref.value());
     } else if constexpr (direction == DataflowDirection::kBackward) {
-      block = succ;
-    }
-    for (mlir::Value arg : block->getArguments()) {
-      auto arg_state_ref = GetStateAt(arg);
-      arg_state_ref.Write(BoundaryInitialValue());
+      pred_state_ref.Join(succ_state_ref.value());
     }
   }
 
-  Base::VisitCFGEdge(pred, branch_succ_index, succ);
+  Base::VisitCFGEdge(edge);
 }
 
 }  // namespace maldoca

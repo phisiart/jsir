@@ -291,6 +291,38 @@ class JsCommentLine : public virtual JsComment {
   void SerializeFields(std::ostream& os, bool &needs_comma) const;
 };
 
+class JsSymbolId {
+ public:
+  explicit JsSymbolId(
+      std::string name,
+      std::optional<int64_t> def_scope_uid);
+
+  void Serialize(std::ostream& os) const;
+
+  static absl::StatusOr<std::unique_ptr<JsSymbolId>> FromJson(const nlohmann::json& json);
+
+  absl::string_view name() const;
+  void set_name(std::string name);
+
+  std::optional<int64_t> def_scope_uid() const;
+  void set_def_scope_uid(std::optional<int64_t> def_scope_uid);
+
+ protected:
+  // Internal function used by Serialize().
+  // Sets the fields defined in this class.
+  // Does not set fields defined in ancestors.
+  void SerializeFields(std::ostream& os, bool &needs_comma) const;
+
+  // Internal functions used by FromJson().
+  // Extracts a field from a JSON object.
+  static absl::StatusOr<std::string> GetName(const nlohmann::json& json);
+  static absl::StatusOr<std::optional<int64_t>> GetDefScopeUid(const nlohmann::json& json);
+
+ private:
+  std::string name_;
+  std::optional<int64_t> def_scope_uid_;
+};
+
 enum class JsNodeType {
   kFile,
   kPrivateName,
@@ -391,7 +423,9 @@ class JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   virtual ~JsNode() = default;
 
@@ -426,6 +460,14 @@ class JsNode {
   std::optional<int64_t> scope_uid() const;
   void set_scope_uid(std::optional<int64_t> scope_uid);
 
+  std::optional<JsSymbolId*> referenced_symbol();
+  std::optional<const JsSymbolId*> referenced_symbol() const;
+  void set_referenced_symbol(std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol);
+
+  std::optional<std::vector<std::unique_ptr<JsSymbolId>>*> defined_symbols();
+  std::optional<const std::vector<std::unique_ptr<JsSymbolId>>*> defined_symbols() const;
+  void set_defined_symbols(std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
+
  protected:
   // Internal function used by Serialize().
   // Sets the fields defined in this class.
@@ -441,6 +483,8 @@ class JsNode {
   static absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsComment>>>> GetTrailingComments(const nlohmann::json& json);
   static absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsComment>>>> GetInnerComments(const nlohmann::json& json);
   static absl::StatusOr<std::optional<int64_t>> GetScopeUid(const nlohmann::json& json);
+  static absl::StatusOr<std::optional<std::unique_ptr<JsSymbolId>>> GetReferencedSymbol(const nlohmann::json& json);
+  static absl::StatusOr<std::optional<std::vector<std::unique_ptr<JsSymbolId>>>> GetDefinedSymbols(const nlohmann::json& json);
 
  private:
   std::optional<std::unique_ptr<JsSourceLocation>> loc_;
@@ -450,6 +494,8 @@ class JsNode {
   std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments_;
   std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments_;
   std::optional<int64_t> scope_uid_;
+  std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol_;
+  std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols_;
 };
 
 class JsInterpreterDirective : public virtual JsNode {
@@ -462,6 +508,8 @@ class JsInterpreterDirective : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::string value);
 
   JsNodeType node_type() const override {
@@ -498,7 +546,9 @@ class JsStatement : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsStatement>> FromJson(const nlohmann::json& json);
 
@@ -518,7 +568,9 @@ class JsModuleDeclaration : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsModuleDeclaration>> FromJson(const nlohmann::json& json);
 
@@ -571,6 +623,8 @@ class JsDirectiveLiteral : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::string value,
       std::optional<std::unique_ptr<JsDirectiveLiteralExtra>> extra);
 
@@ -615,6 +669,8 @@ class JsDirective : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsDirectiveLiteral> value);
 
   JsNodeType node_type() const override {
@@ -653,6 +709,8 @@ class JsProgram : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsInterpreterDirective>> interpreter,
       std::string source_type,
       std::vector<std::variant<std::unique_ptr<JsStatement>, std::unique_ptr<JsModuleDeclaration>>> body,
@@ -711,6 +769,8 @@ class JsFile : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsProgram> program);
 
   JsNodeType node_type() const override {
@@ -748,7 +808,9 @@ class JsExpression : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsExpression>> FromJson(const nlohmann::json& json);
 
@@ -768,7 +830,9 @@ class JsPattern : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsPattern>> FromJson(const nlohmann::json& json);
 
@@ -788,7 +852,9 @@ class JsLVal : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsLVal>> FromJson(const nlohmann::json& json);
 
@@ -809,6 +875,8 @@ class JsIdentifier : public virtual JsExpression, public virtual JsPattern, publ
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::string name);
 
   JsNodeType node_type() const override {
@@ -846,6 +914,8 @@ class JsPrivateName : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsIdentifier> id);
 
   JsNodeType node_type() const override {
@@ -883,7 +953,9 @@ class JsLiteral : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsLiteral>> FromJson(const nlohmann::json& json);
 
@@ -930,6 +1002,8 @@ class JsRegExpLiteral : public virtual JsLiteral {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::string pattern,
       std::string flags,
       std::optional<std::unique_ptr<JsRegExpLiteralExtra>> extra);
@@ -979,7 +1053,9 @@ class JsNullLiteral : public virtual JsLiteral {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   JsNodeType node_type() const override {
     return JsNodeType::kNullLiteral;
@@ -1038,6 +1114,8 @@ class JsStringLiteral : public virtual JsLiteral {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::string value,
       std::optional<std::unique_ptr<JsStringLiteralExtra>> extra);
 
@@ -1082,6 +1160,8 @@ class JsBooleanLiteral : public virtual JsLiteral {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       bool value);
 
   JsNodeType node_type() const override {
@@ -1151,6 +1231,8 @@ class JsNumericLiteral : public virtual JsLiteral {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       double value,
       std::optional<std::unique_ptr<JsNumericLiteralExtra>> extra);
 
@@ -1227,6 +1309,8 @@ class JsBigIntLiteral : public virtual JsLiteral {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::string value,
       std::optional<std::unique_ptr<JsBigIntLiteralExtra>> extra);
 
@@ -1271,6 +1355,8 @@ class JsFunction : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -1322,6 +1408,8 @@ class JsBlockStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::unique_ptr<JsStatement>> body,
       std::vector<std::unique_ptr<JsDirective>> directives);
 
@@ -1367,6 +1455,8 @@ class JsBlockStatementFunction : public virtual JsFunction {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -1403,6 +1493,8 @@ class JsExpressionStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> expression);
 
   JsNodeType node_type() const override {
@@ -1440,7 +1532,9 @@ class JsEmptyStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   JsNodeType node_type() const override {
     return JsNodeType::kEmptyStatement;
@@ -1466,7 +1560,9 @@ class JsDebuggerStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   JsNodeType node_type() const override {
     return JsNodeType::kDebuggerStatement;
@@ -1493,6 +1589,8 @@ class JsWithStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> object,
       std::unique_ptr<JsStatement> body);
 
@@ -1538,6 +1636,8 @@ class JsReturnStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> argument);
 
   JsNodeType node_type() const override {
@@ -1576,6 +1676,8 @@ class JsLabeledStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsIdentifier> label,
       std::unique_ptr<JsStatement> body);
 
@@ -1621,6 +1723,8 @@ class JsBreakStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> label);
 
   JsNodeType node_type() const override {
@@ -1659,6 +1763,8 @@ class JsContinueStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> label);
 
   JsNodeType node_type() const override {
@@ -1697,6 +1803,8 @@ class JsIfStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> test,
       std::unique_ptr<JsStatement> consequent,
       std::optional<std::unique_ptr<JsStatement>> alternate);
@@ -1749,6 +1857,8 @@ class JsSwitchCase : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> test,
       std::vector<std::unique_ptr<JsStatement>> consequent);
 
@@ -1794,6 +1904,8 @@ class JsSwitchStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> discriminant,
       std::vector<std::unique_ptr<JsSwitchCase>> cases);
 
@@ -1839,6 +1951,8 @@ class JsThrowStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> argument);
 
   JsNodeType node_type() const override {
@@ -1877,6 +1991,8 @@ class JsCatchClause : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsPattern>> param,
       std::unique_ptr<JsBlockStatement> body);
 
@@ -1922,6 +2038,8 @@ class JsTryStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsBlockStatement> block,
       std::optional<std::unique_ptr<JsCatchClause>> handler,
       std::optional<std::unique_ptr<JsBlockStatement>> finalizer);
@@ -1974,6 +2092,8 @@ class JsWhileStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> test,
       std::unique_ptr<JsStatement> body);
 
@@ -2019,6 +2139,8 @@ class JsDoWhileStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsStatement> body,
       std::unique_ptr<JsExpression> test);
 
@@ -2063,7 +2185,9 @@ class JsDeclaration : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsDeclaration>> FromJson(const nlohmann::json& json);
 
@@ -2084,6 +2208,8 @@ class JsVariableDeclarator : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsLVal> id,
       std::optional<std::unique_ptr<JsExpression>> init);
 
@@ -2129,6 +2255,8 @@ class JsVariableDeclaration : public virtual JsDeclaration {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::unique_ptr<JsVariableDeclarator>> declarations,
       std::string kind);
 
@@ -2173,6 +2301,8 @@ class JsForStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::variant<std::unique_ptr<JsVariableDeclaration>, std::unique_ptr<JsExpression>>> init,
       std::optional<std::unique_ptr<JsExpression>> test,
       std::optional<std::unique_ptr<JsExpression>> update,
@@ -2232,6 +2362,8 @@ class JsForInStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsVariableDeclaration>, std::unique_ptr<JsLVal>> left,
       std::unique_ptr<JsExpression> right,
       std::unique_ptr<JsStatement> body);
@@ -2284,6 +2416,8 @@ class JsForOfStatement : public virtual JsStatement {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsVariableDeclaration>, std::unique_ptr<JsLVal>> left,
       std::unique_ptr<JsExpression> right,
       std::unique_ptr<JsStatement> body,
@@ -2342,6 +2476,8 @@ class JsFunctionDeclaration : public virtual JsBlockStatementFunction, public vi
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -2372,7 +2508,9 @@ class JsSuper : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   JsNodeType node_type() const override {
     return JsNodeType::kSuper;
@@ -2398,7 +2536,9 @@ class JsImport : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   JsNodeType node_type() const override {
     return JsNodeType::kImport;
@@ -2424,7 +2564,9 @@ class JsThisExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   JsNodeType node_type() const override {
     return JsNodeType::kThisExpression;
@@ -2451,6 +2593,8 @@ class JsArrowFunctionExpression : public virtual JsFunction, public virtual JsEx
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -2493,6 +2637,8 @@ class JsYieldExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> argument,
       bool delegate);
 
@@ -2537,6 +2683,8 @@ class JsAwaitExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> argument);
 
   JsNodeType node_type() const override {
@@ -2575,6 +2723,8 @@ class JsSpreadElement : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> argument);
 
   JsNodeType node_type() const override {
@@ -2613,6 +2763,8 @@ class JsArrayExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::optional<std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSpreadElement>>>> elements);
 
   JsNodeType node_type() const override {
@@ -2651,6 +2803,8 @@ class JsObjectMember : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> key,
       bool computed);
 
@@ -2689,6 +2843,8 @@ class JsObjectProperty : public virtual JsObjectMember {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> key,
       bool computed,
       bool shorthand,
@@ -2735,6 +2891,8 @@ class JsObjectMethod : public virtual JsObjectMember, public virtual JsBlockStat
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> key,
       bool computed,
       std::optional<std::unique_ptr<JsIdentifier>> id,
@@ -2779,6 +2937,8 @@ class JsObjectExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::variant<std::unique_ptr<JsObjectProperty>, std::unique_ptr<JsObjectMethod>, std::unique_ptr<JsSpreadElement>>> properties_);
 
   JsNodeType node_type() const override {
@@ -2817,6 +2977,8 @@ class JsFunctionExpression : public virtual JsBlockStatementFunction, public vir
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -2848,6 +3010,8 @@ class JsUnaryExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       JsUnaryOperator operator_,
       bool prefix,
       std::unique_ptr<JsExpression> argument);
@@ -2898,6 +3062,8 @@ class JsUpdateExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       JsUpdateOperator operator_,
       std::unique_ptr<JsLVal> argument,
       bool prefix);
@@ -2948,6 +3114,8 @@ class JsBinaryExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       JsBinaryOperator operator_,
       std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsPrivateName>> left,
       std::unique_ptr<JsExpression> right);
@@ -2999,6 +3167,8 @@ class JsAssignmentExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       JsAssignmentOperator operator_,
       std::unique_ptr<JsLVal> left,
       std::unique_ptr<JsExpression> right);
@@ -3050,6 +3220,8 @@ class JsLogicalExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       JsLogicalOperator operator_,
       std::unique_ptr<JsExpression> left,
       std::unique_ptr<JsExpression> right);
@@ -3101,6 +3273,8 @@ class JsMemberExpression : public virtual JsExpression, public virtual JsPattern
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSuper>> object,
       std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsPrivateName>> property,
       bool computed);
@@ -3152,6 +3326,8 @@ class JsOptionalMemberExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> object,
       std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsPrivateName>> property,
       bool computed,
@@ -3209,6 +3385,8 @@ class JsConditionalExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> test,
       std::unique_ptr<JsExpression> alternate,
       std::unique_ptr<JsExpression> consequent);
@@ -3261,6 +3439,8 @@ class JsCallExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSuper>, std::unique_ptr<JsImport>> callee,
       std::vector<std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSpreadElement>>> arguments);
 
@@ -3306,6 +3486,8 @@ class JsOptionalCallExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> callee,
       std::vector<std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSpreadElement>>> arguments,
       bool optional);
@@ -3357,6 +3539,8 @@ class JsNewExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSuper>, std::unique_ptr<JsImport>> callee,
       std::vector<std::variant<std::unique_ptr<JsExpression>, std::unique_ptr<JsSpreadElement>>> arguments);
 
@@ -3402,6 +3586,8 @@ class JsSequenceExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::unique_ptr<JsExpression>> expressions);
 
   JsNodeType node_type() const override {
@@ -3440,6 +3626,8 @@ class JsParenthesizedExpression : public virtual JsExpression, public virtual Js
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> expression);
 
   JsNodeType node_type() const override {
@@ -3510,6 +3698,8 @@ class JsTemplateElement : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       bool tail,
       std::unique_ptr<JsTemplateElementValue> value);
 
@@ -3554,6 +3744,8 @@ class JsTemplateLiteral : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::unique_ptr<JsTemplateElement>> quasis,
       std::vector<std::unique_ptr<JsExpression>> expressions);
 
@@ -3599,6 +3791,8 @@ class JsTaggedTemplateExpression : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> tag,
       std::unique_ptr<JsTemplateLiteral> quasi);
 
@@ -3644,6 +3838,8 @@ class JsRestElement : public virtual JsPattern, public virtual JsLVal {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsLVal> argument);
 
   JsNodeType node_type() const override {
@@ -3682,6 +3878,8 @@ class JsObjectPattern : public virtual JsPattern, public virtual JsLVal {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::variant<std::unique_ptr<JsObjectProperty>, std::unique_ptr<JsRestElement>>> properties_);
 
   JsNodeType node_type() const override {
@@ -3720,6 +3918,8 @@ class JsArrayPattern : public virtual JsPattern, public virtual JsLVal {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::optional<std::unique_ptr<JsPattern>>> elements);
 
   JsNodeType node_type() const override {
@@ -3758,6 +3958,8 @@ class JsAssignmentPattern : public virtual JsPattern, public virtual JsLVal {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsPattern> left,
       std::unique_ptr<JsExpression> right);
 
@@ -3803,6 +4005,8 @@ class JsClassMethod : public virtual JsBlockStatementFunction {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -3864,6 +4068,8 @@ class JsClassPrivateMethod : public virtual JsBlockStatementFunction {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsIdentifier>> id,
       std::vector<std::unique_ptr<JsPattern>> params,
       bool generator,
@@ -3925,6 +4131,8 @@ class JsClassProperty : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsExpression> key,
       std::optional<std::unique_ptr<JsExpression>> value,
       bool static_,
@@ -3982,6 +4190,8 @@ class JsClassPrivateProperty : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsPrivateName> key,
       std::optional<std::unique_ptr<JsExpression>> value,
       bool static_);
@@ -4033,6 +4243,8 @@ class JsClassBody : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::variant<std::unique_ptr<JsClassMethod>, std::unique_ptr<JsClassPrivateMethod>, std::unique_ptr<JsClassProperty>, std::unique_ptr<JsClassPrivateProperty>>> body);
 
   JsNodeType node_type() const override {
@@ -4071,6 +4283,8 @@ class JsClass : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> super_class,
       std::unique_ptr<JsClassBody> body);
 
@@ -4110,6 +4324,8 @@ class JsClassDeclaration : public virtual JsClass, public virtual JsDeclaration 
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> super_class,
       std::unique_ptr<JsClassBody> body,
       std::optional<std::unique_ptr<JsIdentifier>> id);
@@ -4150,6 +4366,8 @@ class JsClassExpression : public virtual JsClass, public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsExpression>> super_class,
       std::unique_ptr<JsClassBody> body,
       std::optional<std::unique_ptr<JsIdentifier>> id);
@@ -4190,6 +4408,8 @@ class JsMetaProperty : public virtual JsExpression {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsIdentifier> meta,
       std::unique_ptr<JsIdentifier> property);
 
@@ -4234,7 +4454,9 @@ class JsModuleSpecifier : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
-      std::optional<int64_t> scope_uid);
+      std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols);
 
   static absl::StatusOr<std::unique_ptr<JsModuleSpecifier>> FromJson(const nlohmann::json& json);
 
@@ -4255,6 +4477,8 @@ class JsImportSpecifier : public virtual JsModuleSpecifier {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsIdentifier>, std::unique_ptr<JsStringLiteral>> imported,
       std::unique_ptr<JsIdentifier> local);
 
@@ -4300,6 +4524,8 @@ class JsImportDefaultSpecifier : public virtual JsModuleSpecifier {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsIdentifier> local);
 
   JsNodeType node_type() const override {
@@ -4338,6 +4564,8 @@ class JsImportNamespaceSpecifier : public virtual JsModuleSpecifier {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsIdentifier> local);
 
   JsNodeType node_type() const override {
@@ -4376,6 +4604,8 @@ class JsImportAttribute : public virtual JsNode {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsIdentifier> key,
       std::unique_ptr<JsStringLiteral> value);
 
@@ -4421,6 +4651,8 @@ class JsImportDeclaration : public virtual JsModuleDeclaration {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::vector<std::variant<std::unique_ptr<JsImportSpecifier>, std::unique_ptr<JsImportDefaultSpecifier>, std::unique_ptr<JsImportNamespaceSpecifier>>> specifiers,
       std::unique_ptr<JsStringLiteral> source,
       std::optional<std::unique_ptr<JsImportAttribute>> assertions);
@@ -4473,6 +4705,8 @@ class JsExportSpecifier : public virtual JsModuleSpecifier {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsIdentifier>, std::unique_ptr<JsStringLiteral>> exported,
       std::optional<std::variant<std::unique_ptr<JsIdentifier>, std::unique_ptr<JsStringLiteral>>> local);
 
@@ -4518,6 +4752,8 @@ class JsExportNamedDeclaration : public virtual JsModuleDeclaration {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::optional<std::unique_ptr<JsDeclaration>> declaration,
       std::vector<std::unique_ptr<JsExportSpecifier>> specifiers,
       std::optional<std::unique_ptr<JsStringLiteral>> source,
@@ -4577,6 +4813,8 @@ class JsExportDefaultDeclaration : public virtual JsModuleDeclaration {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::variant<std::unique_ptr<JsFunctionDeclaration>, std::unique_ptr<JsClassDeclaration>, std::unique_ptr<JsExpression>> declaration);
 
   JsNodeType node_type() const override {
@@ -4615,6 +4853,8 @@ class JsExportAllDeclaration : public virtual JsModuleDeclaration {
       std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments,
       std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments,
       std::optional<int64_t> scope_uid,
+      std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol,
+      std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols,
       std::unique_ptr<JsStringLiteral> source,
       std::optional<std::vector<std::unique_ptr<JsImportAttribute>>> assertions);
 

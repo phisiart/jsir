@@ -195,6 +195,26 @@ function parseInternal(source, options) {
         }
       }
     });
+
+    for (const scope of Object.values(scopes)) {
+      for (const [name, binding] of Object.entries(scope.bindings)) {
+        for (const referencePath of binding.referencePaths) {
+          referencePath.node.referencedSymbol = {
+            name: name,
+            defScopeUid: scope.uid,
+          };
+        }
+
+        const def_node = binding.path.node;
+        if (def_node.definedSymbols === undefined) {
+          def_node.definedSymbols = [];
+        }
+        def_node.definedSymbols.push({
+          name,
+          defScopeUid: scope.uid,
+        });
+      }
+    }
   }
 
   // We don't serialize to JSON even though it's possible. The reason is that

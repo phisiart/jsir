@@ -37,6 +37,8 @@ struct JsTrivia {
   std::optional<int64_t> start;
   std::optional<int64_t> end;
   std::optional<int64_t> scope_uid;
+  std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol;
+  std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols;
   std::optional<std::vector<std::unique_ptr<JsComment>>> leading_comments;
   std::optional<std::vector<std::unique_ptr<JsComment>>> trailing_comments;
   std::optional<std::vector<std::unique_ptr<JsComment>>> inner_comments;
@@ -62,7 +64,10 @@ std::unique_ptr<NodeT> CreateJsNodeWithTrivia(JsTrivia trivia, Args &&...args) {
       /*leading_comments=*/std::move(trivia.leading_comments),
       /*trailing_comments=*/std::move(trivia.trailing_comments),
       /*inner_comments=*/std::move(trivia.inner_comments),
-      /*scope_uid=*/trivia.scope_uid, std::forward<Args>(args)...);
+      /*scope_uid=*/trivia.scope_uid,
+      /*referenced_symbol=*/std::move(trivia.referenced_symbol),
+      /*defined_symbols=*/std::move(trivia.defined_symbols),
+      std::forward<Args>(args)...);
 }
 
 template <typename NodeT,

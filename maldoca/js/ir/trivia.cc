@@ -49,6 +49,13 @@ std::unique_ptr<JsPosition> JsirPositionAttr2JsPosition(JsirPositionAttr attr) {
   return absl::make_unique<JsPosition>(loc_start_line, loc_start_column);
 }
 
+JsirSymbolIdAttr GetJsirSymbolIdAttr(mlir::MLIRContext *context,
+                                     const JsSymbolId &symbol_id) {
+  return JsirSymbolIdAttr::get(context,
+                               mlir::StringAttr::get(context, symbol_id.name()),
+                               symbol_id.def_scope_uid());
+}
+
 JsirLocationAttr GetJsirLocationAttr(mlir::MLIRContext *context,
                                      const JsSourceLocation *loc,
                                      std::optional<int64_t> start_index,
@@ -146,8 +153,8 @@ std::vector<std::unique_ptr<JsComment>> JsirCommentAttrs2JsComments(
   return comments;
 }
 
-std::optional<JsirTriviaAttr> GetJsirTriviaAttr(mlir::Attribute attr) {
-  return llvm::TypeSwitch<mlir::Attribute, std::optional<JsirTriviaAttr>>(attr)
+JsirTriviaAttr GetJsirTriviaAttr(mlir::Attribute attr) {
+  return llvm::TypeSwitch<mlir::Attribute, JsirTriviaAttr>(attr)
       .Case([&](JsirStringLiteralAttr attr) { return attr.getLoc(); })
       .Case([&](JsirNumericLiteralAttr attr) { return attr.getLoc(); })
       .Case([&](JsirIdentifierAttr attr) { return attr.getLoc(); })
@@ -161,7 +168,7 @@ std::optional<JsirTriviaAttr> GetJsirTriviaAttr(mlir::Attribute attr) {
       .Default([&](mlir::Attribute attr) {
         LOG(INFO) << "Unexpected mlir::Attribute to get source location from. "
                   << "Maybe we missed a type cast here!";
-        return std::nullopt;
+        return nullptr;
       });
 }
 
@@ -188,8 +195,23 @@ JsirTriviaAttr GetJsirTriviaAttr(mlir::MLIRContext *context,
       JsComments2JsirCommentAttrs(context, node.inner_comments(),
                                   node.scope_uid());
 
+  JsirSymbolIdAttr mlir_referenced_symbol = nullptr;
+  if (node.referenced_symbol().has_value()) {
+    mlir_referenced_symbol =
+        GetJsirSymbolIdAttr(context, **node.referenced_symbol());
+  }
+
+  std::vector<JsirSymbolIdAttr> mlir_defined_symbols;
+  if (node.defined_symbols().has_value()) {
+    for (const auto &defined_symbol : **node.defined_symbols()) {
+      mlir_defined_symbols.push_back(
+          GetJsirSymbolIdAttr(context, *defined_symbol));
+    }
+  }
+
   return JsirTriviaAttr::get(context, jsir_location, mlir_leading_comments,
-                             mlir_trailing_comments, mlir_inner_comments);
+                             mlir_trailing_comments, mlir_inner_comments,
+                             mlir_referenced_symbol, mlir_defined_symbols);
 }
 
 JsTrivia GetJsTrivia(mlir::Operation *op) {
@@ -253,11 +275,33 @@ JsTrivia JsirTriviaAttr2JsTrivia(JsirTriviaAttr attr) {
     inner_comments = JsirCommentAttrs2JsComments(mlir_inner_comments);
   }
 
+  std::optional<std::unique_ptr<JsSymbolId>> referenced_symbol;
+  if (JsirSymbolIdAttr mlir_referenced_symbol = attr.getReferencedSymbol()) {
+    referenced_symbol =
+        std::make_unique<JsSymbolId>(mlir_referenced_symbol.getName().str(),
+                                     mlir_referenced_symbol.getDefScopeId());
+  }
+
+  std::optional<std::vector<std::unique_ptr<JsSymbolId>>> defined_symbols;
+  if (llvm::ArrayRef<JsirSymbolIdAttr> mlir_defined_symbols =
+          attr.getDefinedSymbols();
+      !mlir_defined_symbols.empty()) {
+    std::vector<std::unique_ptr<JsSymbolId>> defined_symbols_vec;
+    for (JsirSymbolIdAttr mlir_defined_symbol : mlir_defined_symbols) {
+      defined_symbols_vec.push_back(std::make_unique<JsSymbolId>(
+          mlir_defined_symbol.getName().str(),
+          mlir_defined_symbol.getDefScopeId()));
+    }
+    defined_symbols = std::move(defined_symbols_vec);
+  }
+
   return JsTrivia{
       .loc = std::move(loc),
       .start = attr.getLoc().getStartIndex(),
       .end = attr.getLoc().getEndIndex(),
       .scope_uid = attr.getLoc().getScopeUid(),
+      .referenced_symbol = std::move(referenced_symbol),
+      .defined_symbols = std::move(defined_symbols),
       .leading_comments = std::move(leading_comments),
       .trailing_comments = std::move(trailing_comments),
       .inner_comments = std::move(inner_comments),
@@ -265,12 +309,12 @@ JsTrivia JsirTriviaAttr2JsTrivia(JsirTriviaAttr attr) {
 }
 
 JsTrivia GetJsTrivia(mlir::Attribute attr) {
-  std::optional<JsirTriviaAttr> mlir_trivia = GetJsirTriviaAttr(attr);
-  if (!mlir_trivia.has_value()) {
+  JsirTriviaAttr mlir_trivia = GetJsirTriviaAttr(attr);
+  if (mlir_trivia == nullptr) {
     return JsTrivia{};
   }
 
-  return JsirTriviaAttr2JsTrivia(*mlir_trivia);
+  return JsirTriviaAttr2JsTrivia(mlir_trivia);
 }
 
 }  // namespace maldoca

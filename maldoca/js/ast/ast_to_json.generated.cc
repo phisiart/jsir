@@ -144,6 +144,28 @@ void JsCommentLine::Serialize(std::ostream& os) const {
 }
 
 // =============================================================================
+// JsSymbolId
+// =============================================================================
+
+void JsSymbolId::SerializeFields(std::ostream& os, bool &needs_comma) const {
+  MaybeAddComma(os, needs_comma);
+  os << "\"name\":" << (nlohmann::json(name_)).dump();
+  if (def_scope_uid_.has_value()) {
+    MaybeAddComma(os, needs_comma);
+    os << "\"defScopeUid\":" << (nlohmann::json(def_scope_uid_.value())).dump();
+  }
+}
+
+void JsSymbolId::Serialize(std::ostream& os) const {
+  os << "{";
+  {
+    bool needs_comma = false;
+    JsSymbolId::SerializeFields(os, needs_comma);
+  }
+  os << "}";
+}
+
+// =============================================================================
 // JsNode
 // =============================================================================
 
@@ -206,6 +228,23 @@ void JsNode::SerializeFields(std::ostream& os, bool &needs_comma) const {
   if (scope_uid_.has_value()) {
     MaybeAddComma(os, needs_comma);
     os << "\"scopeUid\":" << (nlohmann::json(scope_uid_.value())).dump();
+  }
+  if (referenced_symbol_.has_value()) {
+    MaybeAddComma(os, needs_comma);
+    os << "\"referencedSymbol\":";
+    referenced_symbol_.value()->Serialize(os);
+  }
+  if (defined_symbols_.has_value()) {
+    MaybeAddComma(os, needs_comma);
+    os << "\"definedSymbols\":" << "[";
+    {
+      bool needs_comma = false;
+      for (const auto& element : defined_symbols_.value()) {
+        MaybeAddComma(os, needs_comma);
+        element->Serialize(os);
+      }
+    }
+    os << "]";
   }
 }
 

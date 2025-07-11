@@ -75,6 +75,7 @@ cc_library(
         "@abseil-cpp//absl/types:variant",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
     ],
 )
 

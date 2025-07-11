@@ -16,7 +16,6 @@
 
 #include <cassert>
 #include <optional>
-#include <vector>
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
@@ -31,7 +30,10 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
-#include "absl/log/check.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
+#include "maldoca/js/ast/ast.generated.h"
 #include "maldoca/js/ir/analyses/dataflow_analysis.h"
 #include "maldoca/js/ir/analyses/scope.h"
 #include "maldoca/js/ir/ir.h"
@@ -63,6 +65,12 @@ mlir::ChangeResult JsirConstantPropagationValue::Join(
   if (*value_ == *other.value_) {
     return mlir::ChangeResult::NoChange;
   }
+
+  // Case 4. Join(Unknown, A) = Unknown
+  if (IsUnknown()) {
+    return mlir::ChangeResult::NoChange;
+  }
+
   value_ = mlir::Attribute();
   return mlir::ChangeResult::Change;
 }
@@ -203,6 +211,7 @@ void JsirConstantPropagationAnalysis::VisitAssignmentExpression(
     return after.Join(*before);
   }
 
+  results[0].Join(JsirConstantPropagationValue::Unknown());
   const JsirConstantPropagationValue &right = *operands.getRight();
   WriteDenseAfterState(op, left.getName(), right, before, after);
 }
@@ -218,7 +227,7 @@ void JsirConstantPropagationAnalysis::VisitUpdateExpression(
     return after.Join(*before);
   }
 
-  JsirSymbolId symbol_id = GetSymbolId(scopes_, op, id.getName());
+  JsSymbolId symbol_id = GetSymbolId(scopes_, op, id.getName());
   const auto &value_before = before->Get(symbol_id);
   if (value_before.IsUninitialized() || value_before.IsUnknown()) {
     results[0].Join(value_before);
@@ -256,24 +265,33 @@ void JsirConstantPropagationAnalysis::VisitUpdateExpression(
                               before, after);
 }
 
-std::optional<std::vector<mlir::Block *>>
-JsirConstantPropagationAnalysis::InferExecutableSuccessors(
-    mlir::Operation *op,
-    llvm::ArrayRef<const JsirConstantPropagationValue *> operands) {
-  std::optional<std::vector<mlir::Block *>> successors;
-  if (auto branch = llvm::dyn_cast<mlir::cf::BranchOp>(op)) {
-    successors.emplace({branch.getDest()});
-  } else if (auto cond_branch = llvm::dyn_cast<mlir::cf::CondBranchOp>(op)) {
-    mlir::Attribute true_attr = mlir::BoolAttr::get(op->getContext(), true);
-    mlir::Attribute false_attr = mlir::BoolAttr::get(op->getContext(), false);
-    CHECK(!operands.empty());
-    if (**operands[0] == true_attr) {
-      successors.emplace({cond_branch.getTrueDest()});
-    } else if (**operands[0] == false_attr) {
-      successors.emplace({cond_branch.getFalseDest()});
+bool JsirConstantPropagationAnalysis::IsCFGEdgeExecutable(
+    JsirGeneralCfgEdge *edge) {
+  if (!Base::IsBlockCfg(edge)) {
+    return true;
+  }
+
+  auto *term_op = edge->getPred()->getBlock()->getTerminator();
+  if (auto cond_branch = llvm::dyn_cast<mlir::cf::CondBranchOp>(term_op);
+      cond_branch != nullptr) {
+    mlir::Attribute true_attr =
+        mlir::BoolAttr::get(term_op->getContext(), true);
+    mlir::Attribute false_attr =
+        mlir::BoolAttr::get(term_op->getContext(), false);
+
+    auto cond_state_ref = GetStateAt(cond_branch.getCondition());
+    if (cond_state_ref.value().IsUninitialized()) {
+      return false;
+    }
+
+    auto *succ_block = edge->getSucc()->getBlock();
+    if (*cond_state_ref.value() == true_attr) {
+      return succ_block == cond_branch.getTrueDest();
+    } else if (*cond_state_ref.value() == false_attr) {
+      return succ_block == cond_branch.getFalseDest();
     }
   }
-  return successors;
+  return true;
 }
 
 void JsirConstantPropagationAnalysis::VisitOp(
